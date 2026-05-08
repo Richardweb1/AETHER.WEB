@@ -13,45 +13,50 @@ export default function WalletConnect({ onWalletChange }: WalletConnectProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkWallet = async () => {
+    const check = async () => {
       try {
-        if ("aptos" in window) {
-          const aptosWallet = (window as any).aptos;
-          const isConnected = await aptosWallet.isConnected();
+        const petra = (window as any).petra || (window as any).aptos;
+        if (petra) {
+          const isConnected = await petra.isConnected();
           if (isConnected) {
-            const account = await aptosWallet.account();
-            setWallet(account.address);
-            onWalletChange(account.address);
+            const acc = await petra.account();
+            setWallet(acc.address);
+            onWalletChange(acc.address);
           }
         }
       } catch (e) {}
     };
-    checkWallet();
+    setTimeout(check, 500);
   }, []);
 
   const connectWallet = async () => {
     setIsConnecting(true);
     setError(null);
     try {
-      if (!("aptos" in window)) {
-        setError("Please install Petra Wallet first.");
+      const petra = (window as any).petra || (window as any).aptos;
+      if (!petra) {
+        setError("Install Petra Wallet first!");
         setIsConnecting(false);
         return;
       }
-      const aptosWallet = (window as any).aptos;
-      const response = await aptosWallet.connect();
-      setWallet(response.address);
-      onWalletChange(response.address);
+      const acc = await petra.connect();
+      const address = acc.address || acc.publicKey;
+      setWallet(address);
+      onWalletChange(address);
     } catch (e: any) {
-      setError("Connection failed. Please try again.");
+      if (e.code === 4001) {
+        setError("You rejected the connection.");
+      } else {
+        setError("Try again.");
+      }
     }
     setIsConnecting(false);
   };
 
   const disconnectWallet = async () => {
     try {
-      const aptosWallet = (window as any).aptos;
-      await aptosWallet.disconnect();
+      const petra = (window as any).petra || (window as any).aptos;
+      if (petra) await petra.disconnect();
     } catch (e) {}
     setWallet(null);
     onWalletChange("0x000...0000");
@@ -96,12 +101,10 @@ export default function WalletConnect({ onWalletChange }: WalletConnectProps) {
         {isConnecting ? "Connecting..." : "Connect Wallet"}
       </button>
       {error && (
-        <div className="text-xs text-red-400 text-right max-w-[200px]">
+        <div className="text-xs text-red-400 text-right">
           {error}{" "}
-          {error.includes("install") && (
-            <a href="https://petra.app" target="_blank" rel="noopener noreferrer" className="underline">
-              Get Petra
-            </a>
+          {error.includes("Install") && (
+            <a href="https://petra.app" target="_blank" rel="noopener noreferrer" className="underline">Get Petra</a>
           )}
         </div>
       )}
