@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+:root {
+  --accent-primary: #8b5cf6;
+  --accent-secondary: #06b6d4;
+}
+
+body {
+  background: radial-gradient(circle at 50% 50%, #1a1b3a 0%, #05060f 100%);
+  min-height: 100vh;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glow-border:hover {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+  border-color: var(--accent-primary);
+}
+
+@keyframes pulse-subtle {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s infinite ease-in-out;
+}
