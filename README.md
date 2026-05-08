@@ -1,4 +1,4 @@
-# 🧠 Shelby AI Memory
+![AETHER.WEB](./public/aether-banner.png)
 
 **Decentralized Long-Term Memory for AI Agents — Built on Shelby Protocol**
 
