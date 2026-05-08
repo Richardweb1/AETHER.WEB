@@ -1,4 +1,8 @@
+<p align="center">
 
+  <img src="https://raw.githubusercontent.com/Richardweb1/AETHER.WEB/main/public/aether-banner.png.webp" alt="AETHER.WEB" width="100%"/>
+
+</p>
 
 **Decentralized Long-Term Memory for AI Agents — Built on Shelby Protocol**
 
