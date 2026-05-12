@@ -108,4 +108,5 @@ Open http://localhost:3000 http://localhost:3000 for local development
 
 ## Built for the Shelby Ecosystem 
 
-Built with ❤️ by Richard https://github.com/Richardweb1  powered by Shelby Protocol https://shelby.xyz on Aptos
+Built with ❤️ by Richard https://github.com/Richardweb1  powered by Shelby Protocol https://shelby.xyz on Aptos @shelbyserves
+
