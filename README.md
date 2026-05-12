@@ -8,27 +8,20 @@
 
 > Give your AI agent a brain that never forgets, backed by verifiable decentralized hot storage on Aptos.
 
-![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![Shelby](https://img.shields.io/badge/Shelby_Protocol-Testnet-cyan)
-![Aptos](https://img.shields.io/badge/Aptos-Blockchain-green)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
 
-## 🎯 The Problem
+ The Problem
 
 AI agents lose context between sessions. Every conversation is ephemeral — once the session ends, the AI forgets everything. For AI to be used in legal, financial, or sensitive environments, it needs a **permanent, verifiable memory**.
 
-## 💡 The Solution
+ The Solution
 
-**Shelby AI Memory** stores every AI interaction as a JSON blob on **Shelby Protocol's decentralized hot storage**. Unlike cold storage (IPFS, Filecoin), Shelby offers:
+Shelby AI Memory** stores every AI interaction as a JSON blob on **Shelby Protocol's decentralized hot storage**. Unlike cold storage (IPFS, Filecoin), Shelby offers:
 
-- ⚡ **Millisecond retrieval** — Hot storage for real-time AI context
-- 🔐 **Cryptographic receipts** — Every read is verifiable on Aptos
-- 🌍 **Global availability** — Decentralized nodes across the network
-- 🧠 **Persistent memory** — AI agents recall past conversations across sessions
 
-## 🏗 Architecture
 
-```
+ Architecture
+
+
 User ──► Chat UI ──► Next.js API ──► Shelby SDK ──► Decentralized Storage
                          │                              (Aptos Testnet)
                          ▼
@@ -54,7 +47,7 @@ User ──► Chat UI ──► Next.js API ──► Shelby SDK ──► Dece
 }
 ```
 
-## 🚀 Features
+# Features
 
 - **Verifiable Chat** — Every AI response is stored on Shelby with a blob reference
 - **Memory Dashboard** — Browse, search, and inspect stored memories
@@ -62,7 +55,7 @@ User ──► Chat UI ──► Next.js API ──► Shelby SDK ──► Dece
 - **Wallet Identity** — Memories are associated with wallet addresses
 - **Smart Fallback** — Topic-aware responses when LLM is unavailable
 
-## 🛠 Tech Stack
+# Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -72,13 +65,13 @@ User ──► Chat UI ──► Next.js API ──► Shelby SDK ──► Dece
 | Blockchain | Aptos Testnet (`@aptos-labs/ts-sdk`) |
 | Animations | Framer Motion |
 
-## 📦 Getting Started
+# Getting Started
 
-### Prerequisites
+# Prerequisites
 - Node.js 20+
 - npm
 
-### Installation
+# Installation
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/shelby-ai-memory.git
@@ -86,7 +79,7 @@ cd shelby-ai-memory
 npm install
 ```
 
-### Environment Setup
+# Environment Setup
 
 Create a `.env.local` file:
 
@@ -111,43 +104,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-## 📁 Project Structure
 
-```
-shelby/
-├── app/
-│   ├── api/memory/         # API routes for store/retrieve
-│   ├── layout.tsx          # App layout
-│   ├── page.tsx            # Main page with Chat & Dashboard
-│   └── globals.css         # Design system
-├── components/
-│   ├── chat/ChatBox.tsx    # Chat interface with Shelby verification
-│   └── dashboard/MemoryDashboard.tsx  # Memory browser
-├── lib/
-│   ├── shelby-service.ts   # Shelby SDK integration
-│   ├── ai-service.ts       # Multi-LLM service (Gemini/Groq/OpenAI)
-│   └── db.ts               # Local memory indexer
-└── .env.local              # API keys (not committed)
-```
 
-## 🔮 Roadmap
 
-- [ ] Real wallet connection (Petra/Pontem)
-- [ ] Semantic search across memories (vector embeddings)
-- [ ] Encrypted memory vaults (AES-GCM client-side)
-- [ ] Cross-agent memory sharing
-- [ ] Root CID registry on Aptos
 
-## 📚 Resources
-
-- [Shelby Protocol Docs](https://docs.staging.shelby.xyz/protocol)
-- [Shelby TypeScript SDK](https://docs.staging.shelby.xyz/sdks/typescript)
-- [Aptos Developer Docs](https://aptos.dev)
-
-## 📄 License
-
-MIT
-
----
 
 *Built for the Shelby Ecosystem 🛡️*
