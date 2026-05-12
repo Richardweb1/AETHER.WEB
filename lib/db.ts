@@ -1,10 +1,5 @@
-import fs from 'fs';
-import path from 'path';
-
-// Simple file-based DB for tracking CIDs associated with users
-const DB_PATH = path.join(process.cwd(), 'memory_index.json');
-
-export interface MemoryIndexEntry {
+// In-memory storage for Vercel (read-only filesystem)
+interface MemoryIndex {
   cid: string;
   agent_id: string;
   wallet_address: string;
@@ -12,15 +7,19 @@ export interface MemoryIndexEntry {
   preview: string;
 }
 
-export function saveToIndex(entry: MemoryIndexEntry) {
-  const index = getIndex();
-  index.push(entry);
-  fs.writeFileSync(DB_PATH, JSON.stringify(index, null, 2));
+const memoryStore: MemoryIndex[] = [];
+
+export function saveToIndex(entry: MemoryIndex): void {
+  try {
+    memoryStore.unshift(entry);
+    if (memoryStore.length > 100) {
+      memoryStore.pop();
+    }
+  } catch (e) {
+    console.error("Failed to save to index:", e);
+  }
 }
 
-export function getIndex(): MemoryIndexEntry[] {
-  if (!fs.existsSync(DB_PATH)) {
-    return [];
-  }
-  return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
+export function getIndex(): MemoryIndex[] {
+  return memoryStore;
 }
