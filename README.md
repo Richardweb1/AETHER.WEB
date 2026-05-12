@@ -34,7 +34,7 @@ User ──► Chat UI ──► Next.js API ──► Shelby SDK ──► Dece
 ```json
 {
   "agent_id": "Shelby-Alpha-01",
-  "wallet_address": "0x789...abcd",
+  "wallet_address": ,
   "interaction": {
     "prompt": "What is decentralized storage?",
     "response": "Decentralized storage distributes data across...",
@@ -79,24 +79,9 @@ cd shelby-ai-memory
 npm install
 ```
 
-# Environment Setup
 
-Create a `.env.local` file:
 
-```env
-# Shelby Protocol
-SHELBY_API_KEY=aptoslabs_your_key_here
-
-# LLM (choose one)
-GEMINI_API_KEY=your_gemini_key
-# GROQ_API_KEY=your_groq_key
-# OPENAI_API_KEY=your_openai_key
-
-# Optional: Aptos Account
-# APTOS_PRIVATE_KEY=ed25519-priv-...
-```
-
-### Run
+ Run
 
 ```bash
 npm run dev
