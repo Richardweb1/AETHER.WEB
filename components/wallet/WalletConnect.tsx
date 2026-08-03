@@ -14,8 +14,10 @@ export default function WalletConnect({ onWalletChange }: WalletConnectProps) {
   useEffect(() => {
     if (account?.address) {
       onWalletChange(account.address.toString());
+    } else {
+      onWalletChange("");
     }
-  }, [account]);
+  }, [account, onWalletChange]);
 
   const handleConnect = async () => {
     const petra = wallets?.find((w) => w.name === "Petra");

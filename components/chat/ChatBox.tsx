@@ -109,7 +109,7 @@ async function delay(ms: number) {
 }
 
 export default function ChatBox({ wallet }: { wallet: string }) {
-  const { network, signAndSubmitTransaction, changeNetwork, signMessage } = useWallet();
+  const { account, connected, network, signAndSubmitTransaction, changeNetwork, signMessage } = useWallet();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -121,6 +121,8 @@ export default function ChatBox({ wallet }: { wallet: string }) {
   const [swapNetwork, setSwapNetwork] = useState<SwapNetwork>("aptos-mainnet");
   const [quote, setQuote] = useState<DexQuote | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeWallet = connected && account?.address ? account.address.toString() : wallet;
+  const isWalletReady = Boolean(connected && activeWallet);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { setQuote(null); }, [swapAmount, fromToken, toToken, swapNetwork]);
   useEffect(() => {
@@ -130,14 +132,14 @@ export default function ChatBox({ wallet }: { wallet: string }) {
   }, [swapNetwork, fromToken, toToken]);
   const submitPrompt = async (promptText: string) => {
     if (!promptText.trim() || isLoading) return;
-    if (!wallet) { alert("Please connect your Petra wallet first!"); return; }
+    if (!isWalletReady) { alert("Please connect your Petra wallet first!"); return; }
     const userMsg: ChatMessage = { role: "user", content: promptText };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setIsLoading(true);
     setMessages(prev => [...prev, { role: "assistant", content: "", status: "thinking" }]);
     try {
-      const res = await fetch("/api/memory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet_address: wallet, prompt: promptText }) });
+      const res = await fetch("/api/memory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet_address: activeWallet, prompt: promptText }) });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       setMessages(prev => { const updated = [...prev]; const idx = updated.findIndex(m => m.status === "thinking"); if (idx !== -1) updated[idx] = { role: "assistant", content: data.aiResponse, status: "storing", swapIntent: data.swapIntent }; return updated; });
@@ -168,7 +170,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
   };
   const getCurrentWalletNetwork = () => network?.name?.toString().toLowerCase() || "";
   const walletMatchesSwapNetwork = (selectedNetwork: SwapNetwork) =>
-    getCurrentWalletNetwork() === getExpectedWalletNetwork(selectedNetwork);
+    isWalletReady && getCurrentWalletNetwork() === getExpectedWalletNetwork(selectedNetwork);
   const handleSwitchWalletNetwork = async () => {
     try {
       if (swapNetwork === "aptos-mainnet") await changeNetwork(Network.MAINNET);
@@ -185,6 +187,10 @@ export default function ChatBox({ wallet }: { wallet: string }) {
   const handleQuote = async () => {
     if (!swapAmount.trim()) {
       alert("Enter an amount first.");
+      return;
+    }
+    if (!isWalletReady) {
+      alert("Connect Petra wallet first.");
       return;
     }
     if (fromToken === toToken) {
@@ -236,7 +242,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         const message = [
           "AETHER.WEB review swap",
           `Network: ${quote.network}`,
-          `Wallet: ${wallet}`,
+          `Wallet: ${activeWallet}`,
           `Swap: ${quote.amount} ${quote.fromToken} to ${quote.toToken}`,
           `Expected output: ${quote.expectedOut} ${quote.toToken}`,
         ].join("\n");
@@ -261,7 +267,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            wallet_address: wallet,
+            wallet_address: activeWallet,
             txHash,
             network: quote.network,
             fromToken: quote.fromToken,
@@ -288,7 +294,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          wallet_address: wallet,
+          wallet_address: activeWallet,
           network: quote.network,
           toToken: quote.toToken,
         }),
@@ -321,7 +327,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          wallet_address: wallet,
+          wallet_address: activeWallet,
           txHash,
           network: quote.network,
           fromToken: quote.fromToken,
@@ -365,7 +371,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
             <select
               value={swapNetwork}
               onChange={(e) => setSwapNetwork(e.target.value as SwapNetwork)}
-              disabled={isLoading || !wallet}
+              disabled={isLoading || !isWalletReady}
               className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none transition focus:border-cyan-400/60 disabled:opacity-50"
             >
               {SWAP_NETWORKS.map((network) => <option key={network.id} value={network.id}>{network.label}</option>)}
@@ -375,13 +381,13 @@ export default function ChatBox({ wallet }: { wallet: string }) {
               onChange={(e) => setSwapAmount(e.target.value)}
               placeholder="Amount"
               inputMode="decimal"
-              disabled={isLoading || !wallet}
+              disabled={isLoading || !isWalletReady}
               className="min-w-0 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none transition focus:border-cyan-400/60 disabled:opacity-50"
             />
             <select
               value={fromToken}
               onChange={(e) => setFromToken(e.target.value)}
-              disabled={isLoading || !wallet}
+              disabled={isLoading || !isWalletReady}
               className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none transition focus:border-cyan-400/60 disabled:opacity-50"
             >
               {SWAP_TOKENS[swapNetwork].map((token) => <option key={token} value={token}>{token}</option>)}
@@ -389,14 +395,14 @@ export default function ChatBox({ wallet }: { wallet: string }) {
             <select
               value={toToken}
               onChange={(e) => setToToken(e.target.value)}
-              disabled={isLoading || !wallet}
+              disabled={isLoading || !isWalletReady}
               className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none transition focus:border-cyan-400/60 disabled:opacity-50"
             >
               {SWAP_TOKENS[swapNetwork].map((token) => <option key={token} value={token}>{token}</option>)}
             </select>
             <button
               onClick={handleQuote}
-              disabled={isLoading || isQuoting || isSwapping || !wallet || fromToken === toToken}
+              disabled={isLoading || isQuoting || isSwapping || !isWalletReady || fromToken === toToken}
               className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-50"
             >
               {isQuoting ? "Quoting..." : "Get Quote"}
@@ -414,7 +420,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
                 APT faucet <ExternalLink className="h-3 w-3" />
               </a>
               <a
-                href={`${SHELBYNET_USD_FAUCET_URL}${wallet ? `?address=${wallet}` : ""}`}
+                href={`${SHELBYNET_USD_FAUCET_URL}${activeWallet ? `?address=${activeWallet}` : ""}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded-lg border border-cyan-400/20 px-2 py-1 text-cyan-200 transition hover:border-cyan-300/50 hover:text-cyan-100"
@@ -423,7 +429,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
               </a>
             </div>
           )}
-          {wallet && !walletMatchesSwapNetwork(swapNetwork) && (
+          {isWalletReady && !walletMatchesSwapNetwork(swapNetwork) && (
             <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-50">
               <AlertCircle className="h-4 w-4 text-amber-300" />
               <span>
@@ -445,7 +451,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
               </span>
               <button
                 onClick={handleConfirmSwap}
-                disabled={isSwapping || !wallet || !walletMatchesSwapNetwork(quote.network)}
+                disabled={isSwapping || !isWalletReady || !walletMatchesSwapNetwork(quote.network)}
                 className="ml-auto rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-500 disabled:opacity-50"
               >
                 {isSwapping ? "Confirming..." : quote.reviewMode ? "Sign Review Swap" : "Confirm Swap"}
@@ -453,7 +459,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
             </div>
           )}
         </div>
-        {messages.length === 0 && (<div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{wallet ? "Start a conversation or swap on the selected network. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
+        {messages.length === 0 && (<div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{isWalletReady ? "Start a conversation or swap on the selected network. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
         <AnimatePresence>
           {messages.map((m, idx) => (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={idx} className={"flex " + (m.role === "user" ? "justify-end" : "justify-start")}>
@@ -480,8 +486,8 @@ export default function ChatBox({ wallet }: { wallet: string }) {
       </div>
       <div className="p-6 bg-white/5 border-t border-white/10">
         <div className="flex gap-2">
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={wallet ? "Ask Shelby AI anything..." : "Connect wallet first..."} disabled={isLoading || !wallet} className="flex-1 bg-transparent border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-violet-500/50 transition disabled:opacity-50" />
-          <button onClick={handleSend} disabled={isLoading || !wallet} className="p-3 bg-violet-600 rounded-xl hover:bg-violet-500 transition disabled:opacity-50">
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={isWalletReady ? "Ask Shelby AI anything..." : "Connect wallet first..."} disabled={isLoading || !isWalletReady} className="flex-1 bg-transparent border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-violet-500/50 transition disabled:opacity-50" />
+          <button onClick={handleSend} disabled={isLoading || !isWalletReady} className="p-3 bg-violet-600 rounded-xl hover:bg-violet-500 transition disabled:opacity-50">
             {isLoading ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Send className="w-5 h-5 text-white" />}
           </button>
         </div>

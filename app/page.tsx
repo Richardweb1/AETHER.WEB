@@ -7,7 +7,7 @@ import WalletConnect from "@/components/wallet/WalletConnect";
 
 export default function Home() {
   const [view, setView] = useState<"chat" | "dashboard">("chat");
-  const [wallet, setWallet] = useState<string>("0x000...0000");
+  const [wallet, setWallet] = useState<string>("");
   return (
     <main className="flex min-h-screen flex-col items-center p-8 space-y-8">
       <div className="w-full max-w-5xl flex justify-between items-center p-6 glass rounded-2xl">
