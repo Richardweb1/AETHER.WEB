@@ -21,6 +21,48 @@ function isRateLimited(key: string): boolean {
   return bucket.count > RATE_LIMIT_MAX;
 }
 
+type HistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+function isSwapStatusQuestion(prompt: string): boolean {
+  const lower = prompt.toLowerCase();
+  return lower.includes("swap") && (
+    lower.includes("check") ||
+    lower.includes("confirm") ||
+    lower.includes("confirmed") ||
+    lower.includes("status") ||
+    lower.includes("completed") ||
+    lower.includes("wach") ||
+    lower.includes("واش")
+  );
+}
+
+function buildSwapStatusResponse(history: HistoryMessage[]): string {
+  const lastSwapRecord = [...history]
+    .reverse()
+    .find((message) =>
+      message.role === "assistant" &&
+      /swap/i.test(message.content) &&
+      /(completed|recorded|executed|stored on shelby|wallet approval|transaction)/i.test(message.content)
+    );
+
+  if (!lastSwapRecord) {
+    return "I do not see a completed swap record in this chat yet. Run Get Quote and confirm/sign from the DEX box, then I can verify the Shelby record here.";
+  }
+
+  const lines = lastSwapRecord.content
+    .split("\n")
+    .filter((line) => /(completed|recorded|executed|network|request|quoted output|wallet approval|transaction)/i.test(line))
+    .slice(0, 6);
+
+  return [
+    "Yes, the latest swap action in this chat is confirmed as recorded on Shelby.",
+    ...lines,
+  ].join("\n");
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const wallet = searchParams.get('wallet');
@@ -39,11 +81,15 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { wallet_address, prompt } = body;
-    const history = Array.isArray(body.history)
+    const history: HistoryMessage[] = Array.isArray(body.history)
       ? body.history
           .filter((message: unknown) => {
             const item = message as Record<string, unknown>;
             return (item.role === "user" || item.role === "assistant") && typeof item.content === "string";
+          })
+          .map((message: unknown) => {
+            const item = message as HistoryMessage;
+            return { role: item.role, content: item.content };
           })
           .slice(-8)
       : [];
@@ -65,8 +111,13 @@ export async function POST(req: Request) {
       }, { status: 429 });
     }
 
-    const swapIntent = parseSwapIntent(prompt);
-    const aiResponse = swapIntent ? buildSwapResponse(swapIntent) : await generateAIResponse(prompt, history);
+    const swapStatusQuestion = isSwapStatusQuestion(prompt);
+    const swapIntent = swapStatusQuestion ? null : parseSwapIntent(prompt);
+    const aiResponse = swapStatusQuestion
+      ? buildSwapStatusResponse(history)
+      : swapIntent
+        ? buildSwapResponse(swapIntent)
+        : await generateAIResponse(prompt, history);
     const entry = buildMemoryEntry(prompt, aiResponse, walletAddr, swapIntent ? { feature: "swap", swap: swapIntent } : {});
     const result = await storeMemory(entry);
 

@@ -26,6 +26,7 @@ const TOKEN_ALIASES: Record<string, string> = {
 };
 
 const SWAP_KEYWORDS = ["swap", "swapi", "بدل", "bdel", "convert", "exchange"];
+const SWAP_STATUS_KEYWORDS = ["check", "confirmed", "confirm", "status", "completed", "was", "واش", "wach"];
 const IGNORED_WORDS = new Set([
   "swap",
   "swapi",
@@ -72,6 +73,10 @@ export function parseSwapIntent(prompt: string): SwapIntent | null {
   const normalized = prompt.toLowerCase().replace(/[,،]/g, " ");
 
   if (!SWAP_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+    return null;
+  }
+
+  if (SWAP_STATUS_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
     return null;
   }
 
