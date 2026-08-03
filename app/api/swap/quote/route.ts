@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildLiquidswapQuote, DexNetwork, getSupportedDexTokens } from "@/lib/dex-service";
+import { buildLiquidswapQuote, DexNetwork, getDexNetworks, getSupportedDexTokens } from "@/lib/dex-service";
 
 export async function GET() {
   return NextResponse.json({
@@ -8,11 +8,7 @@ export async function GET() {
       "aptos-mainnet": getSupportedDexTokens("aptos-mainnet"),
       shelbynet: getSupportedDexTokens("shelbynet"),
     },
-    networks: [
-      { id: "aptos-testnet", label: "Aptos Testnet", executable: true },
-      { id: "aptos-mainnet", label: "Aptos Mainnet", executable: true },
-      { id: "shelbynet", label: "ShelbyNet", executable: Boolean(process.env.LIQUIDSWAP_SHELBYNET_ACCOUNT && process.env.LIQUIDSWAP_SHELBYNET_RESOURCE_ACCOUNT) },
-    ],
+    networks: getDexNetworks(),
   });
 }
 

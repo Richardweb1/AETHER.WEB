@@ -32,6 +32,11 @@ export interface SwapQuote {
 const TESTNET_NODE_URL = process.env.APTOS_TESTNET_NODE_URL || process.env.APTOS_NODE_URL || "https://fullnode.testnet.aptoslabs.com/v1";
 const MAINNET_NODE_URL = process.env.APTOS_MAINNET_NODE_URL || "https://fullnode.mainnet.aptoslabs.com/v1";
 const SHELBY_NODE_URL = process.env.SHELBYNET_NODE_URL || "https://api.shelbynet.shelby.xyz/v1";
+const SHELBY_INDEXER_URL = process.env.SHELBYNET_INDEXER_URL || "https://api.shelbynet.shelby.xyz/v1/graphql";
+const SHELBY_RPC_URL = process.env.SHELBYNET_RPC_URL || "https://api.shelbynet.shelby.xyz/shelby";
+const SHELBY_APT_FAUCET_URL = "https://faucet.shelbynet.shelby.xyz";
+const SHELBY_USD_FAUCET_URL = "https://docs.shelby.xyz/apis/faucet/shelbyusd";
+const SHELBY_CONTRACT_ACCOUNT = "0x85fdb9a176ab8ef1d9d9c1b60d60b3924f0800ac1de1cc2085fb0b8bb4988e6a";
 const DEFAULT_SLIPPAGE = Number(process.env.DEX_SLIPPAGE || "0.005");
 const TESTNET_LIQUIDSWAP_ACCOUNT =
   process.env.LIQUIDSWAP_TESTNET_ACCOUNT || "0x43417434fd869edee76cca2a4d2301e528a1551b1d719b75c350c3c97d15b8b9";
@@ -107,6 +112,24 @@ const TOKEN_SETS: Record<DexNetwork, Record<string, DexToken>> = {
 const STABLE_PAIRS = new Set(["USDC-USDT", "USDT-USDC"]);
 const MAINNET_V05_PAIRS = new Set(["USDC-USDT", "USDT-USDC"]);
 
+export function getDexNetworks() {
+  return [
+    { id: "aptos-testnet", label: "Aptos Testnet", executable: true },
+    { id: "aptos-mainnet", label: "Aptos Mainnet", executable: true },
+    {
+      id: "shelbynet",
+      label: "ShelbyNet",
+      executable: Boolean(SHELBY_LIQUIDSWAP_ACCOUNT && SHELBY_RESOURCE_ACCOUNT),
+      nodeUrl: SHELBY_NODE_URL,
+      indexerUrl: SHELBY_INDEXER_URL,
+      shelbyRpcUrl: SHELBY_RPC_URL,
+      aptFaucetUrl: SHELBY_APT_FAUCET_URL,
+      shelbyUsdFaucetUrl: SHELBY_USD_FAUCET_URL,
+      shelbyContractAccount: SHELBY_CONTRACT_ACCOUNT,
+    },
+  ];
+}
+
 function getNetworkConfig(network: DexNetwork) {
   if (network === "aptos-mainnet") {
     return {
@@ -119,7 +142,9 @@ function getNetworkConfig(network: DexNetwork) {
 
   if (network === "shelbynet") {
     if (!SHELBY_LIQUIDSWAP_ACCOUNT || !SHELBY_RESOURCE_ACCOUNT) {
-      throw new Error("ShelbyNet swap is ready in the UI, but no ShelbyNet DEX router is configured yet. Deploy Liquidswap-compatible contracts on ShelbyNet, then set LIQUIDSWAP_SHELBYNET_ACCOUNT and LIQUIDSWAP_SHELBYNET_RESOURCE_ACCOUNT.");
+      throw new Error(
+        "ShelbyNet network config is loaded from Shelby docs, including fullnode, indexer, Shelby RPC, faucet links, and Shelby storage contract. I could not find an official ShelbyNet DEX router address in the Shelby docs/examples, so on-chain swap execution needs LIQUIDSWAP_SHELBYNET_ACCOUNT and LIQUIDSWAP_SHELBYNET_RESOURCE_ACCOUNT from the DEX/router deployment."
+      );
     }
 
     return {

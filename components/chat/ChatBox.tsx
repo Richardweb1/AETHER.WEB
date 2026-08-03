@@ -19,6 +19,9 @@ const SWAP_TOKENS: Record<SwapNetwork, string[]> = {
   shelbynet: ["APT", "USDC", "USDT"],
 };
 
+const SHELBYNET_APT_FAUCET_URL = "https://faucet.shelbynet.shelby.xyz";
+const SHELBYNET_USD_FAUCET_URL = "https://docs.shelby.xyz/apis/faucet/shelbyusd";
+
 interface DexQuote {
   network: SwapNetwork;
   fromToken: string;
@@ -136,6 +139,9 @@ export default function ChatBox({ wallet }: { wallet: string }) {
       if (quote.network === "aptos-mainnet") {
         await changeNetwork(Network.MAINNET);
       }
+      if (quote.network === "shelbynet") {
+        await changeNetwork(Network.SHELBYNET);
+      }
       const result = await signAndSubmitTransaction({
         data: {
           function: quote.payload.function,
@@ -229,6 +235,27 @@ export default function ChatBox({ wallet }: { wallet: string }) {
               {isQuoting ? "Quoting..." : "Get Quote"}
             </button>
           </div>
+          {swapNetwork === "shelbynet" && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-cyan-50">
+              <span className="text-slate-300">ShelbyNet</span>
+              <a
+                href={SHELBYNET_APT_FAUCET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-lg border border-cyan-400/20 px-2 py-1 text-cyan-200 transition hover:border-cyan-300/50 hover:text-cyan-100"
+              >
+                APT faucet <ExternalLink className="h-3 w-3" />
+              </a>
+              <a
+                href={`${SHELBYNET_USD_FAUCET_URL}${wallet ? `?address=${wallet}` : ""}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-lg border border-cyan-400/20 px-2 py-1 text-cyan-200 transition hover:border-cyan-300/50 hover:text-cyan-100"
+              >
+                ShelbyUSD faucet <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          )}
           {quote && (
             <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-cyan-50">
               <span className="font-mono">{`${quote.amount} ${quote.fromToken} -> ${quote.expectedOut} ${quote.toToken}`}</span>
