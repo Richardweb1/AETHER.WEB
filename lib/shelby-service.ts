@@ -4,6 +4,7 @@ import { Account, Ed25519PrivateKey } from "@aptos-labs/ts-sdk";
 const SHELBY_API_KEY = process.env.SHELBY_API_KEY || "AG-MR5SFEFY8BSVMEMVG9YETVQBZJJ2QYEPF";
 const APTOS_PRIVATE_KEY = process.env.APTOS_PRIVATE_KEY || "";
 const APTOS_ACCOUNT_ADDRESS = process.env.APTOS_ACCOUNT_ADDRESS || "0x2b1abb3c4369ae67c04d4d8eb0758a7e2846a136dd48249b805fab871a974f39";
+const SHELBY_NETWORK = "shelbynet" as never;
 
 export interface MemoryEntry {
   agent_id: string;
@@ -13,7 +14,7 @@ export interface MemoryEntry {
     response: string;
     timestamp: number;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface StoreResult {
@@ -38,17 +39,14 @@ export async function storeMemory(entry: MemoryEntry): Promise<StoreResult> {
       const account = Account.fromPrivateKey({ privateKey });
 
       const client = new ShelbyClient({
-        network: "shelbynet" as any,
+        network: SHELBY_NETWORK,
         aptos: {
-          network: "shelbynet" as any,
+          network: SHELBY_NETWORK,
           fullnode: "https://api.shelbynet.shelby.xyz/v1",
           indexer: "https://api.shelbynet.shelby.xyz/v1/graphql",
           clientConfig: { API_KEY: SHELBY_API_KEY },
         },
-        shelby: {
-          rpc: { baseUrl: "https://api.shelbynet.shelby.xyz/shelby" },
-        },
-      } as any);
+      });
 
       const blobData = new TextEncoder().encode(JSON.stringify(entry));
       const expirationMicros = (Date.now() + 30 * 24 * 60 * 60 * 1000) * 1000;
@@ -58,8 +56,8 @@ export async function storeMemory(entry: MemoryEntry): Promise<StoreResult> {
       console.log("✅ Shelby Upload Success:", blobName);
       return { success: true, blobName, accountAddress: APTOS_ACCOUNT_ADDRESS, timestamp, explorerUrl };
 
-    } catch (error: any) {
-      console.error("❌ Shelby Upload Error:", error.message);
+    } catch (error: unknown) {
+      console.error("Shelby Upload Error:", error instanceof Error ? error.message : error);
     }
   }
 
@@ -78,12 +76,13 @@ export async function storeMemory(entry: MemoryEntry): Promise<StoreResult> {
 export function buildMemoryEntry(
   prompt: string,
   response: string,
-  walletAddress: string
+  walletAddress: string,
+  metadata: Record<string, unknown> = {}
 ): MemoryEntry {
   return {
     agent_id: "Shelby-Alpha-01",
     wallet_address: walletAddress,
     interaction: { prompt, response, timestamp: Date.now() },
-    metadata: { source: "AETHER.WEB", version: "1.0.0" },
+    metadata: { source: "AETHER.WEB", version: "1.0.0", ...metadata },
   };
 }

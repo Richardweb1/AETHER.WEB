@@ -1,10 +1,39 @@
 import { NextResponse } from 'next/server';
 import { generateAIResponse } from '@/lib/ai-service';
 import { storeMemory, buildMemoryEntry } from '@/lib/shelby-service';
+import { saveToIndex, getIndex } from '@/lib/db';
+import { buildSwapResponse, parseSwapIntent } from '@/lib/swap-service';
 
-// In-memory store for rate limiting
-const ipRequests = new Map<string, number>();
-const walletRequests = new Map<string, number>();
+const requestBuckets = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 30;
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const bucket = requestBuckets.get(key);
+
+  if (!bucket || bucket.resetAt < now) {
+    requestBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+
+  bucket.count += 1;
+  return bucket.count > RATE_LIMIT_MAX;
+}
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const wallet = searchParams.get('wallet');
+  const memories = getIndex();
+
+  if (!wallet) {
+    return NextResponse.json(memories);
+  }
+
+  return NextResponse.json(
+    memories.filter((entry) => entry.wallet_address === wallet || wallet === "0x000...0000")
+  );
+}
 
 export async function POST(req: Request) {
   try {
@@ -17,39 +46,35 @@ export async function POST(req: Request) {
 
     const walletAddr = wallet_address || "0xanonymous";
 
-    // Get IP address
     const ip = req.headers.get('x-forwarded-for') || 
                 req.headers.get('x-real-ip') || 
                 'unknown';
 
-    // Check IP limit
-    if (ip !== 'unknown' && ipRequests.has(ip)) {
+    if (isRateLimited(`${ip}:${walletAddr}`)) {
       return NextResponse.json({ 
         success: false, 
-        error: "You have already used your free AI request from this IP address." 
+        error: "Too many requests. Please wait a minute and try again." 
       }, { status: 429 });
     }
 
-    // Check wallet limit
-    if (walletAddr !== "0xanonymous" && walletRequests.has(walletAddr)) {
-      return NextResponse.json({ 
-        success: false, 
-        error: "You have already used your free AI request with this wallet." 
-      }, { status: 429 });
-    }
-
-    // Mark IP and wallet as used
-    ipRequests.set(ip, 1);
-    walletRequests.set(walletAddr, 1);
-
-    // 1. Generate AI response
-    const aiResponse = await generateAIResponse(prompt);
-
-    // 2. Build memory entry
-    const entry = buildMemoryEntry(prompt, aiResponse, walletAddr);
-
-    // 3. Store on Shelby
+    const swapIntent = parseSwapIntent(prompt);
+    const aiResponse = swapIntent ? buildSwapResponse(swapIntent) : await generateAIResponse(prompt);
+    const entry = buildMemoryEntry(prompt, aiResponse, walletAddr, swapIntent ? { feature: "swap", swap: swapIntent } : {});
     const result = await storeMemory(entry);
+
+    saveToIndex({
+      cid: `memory-${result.timestamp}`,
+      blobName: result.blobName,
+      agent_id: entry.agent_id,
+      wallet_address: walletAddr,
+      timestamp: result.timestamp,
+      preview: swapIntent
+        ? `Swap: ${swapIntent.amount || "?"} ${swapIntent.fromToken || "?"} -> ${swapIntent.toToken || "?"}`
+        : prompt.slice(0, 120),
+      prompt,
+      response: aiResponse,
+      metadata: entry.metadata,
+    });
 
     return NextResponse.json({
       success: true,
@@ -59,10 +84,11 @@ export async function POST(req: Request) {
       accountAddress: result.accountAddress,
       explorerUrl: result.explorerUrl,
       timestamp: result.timestamp,
+      swapIntent,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Memory API Error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

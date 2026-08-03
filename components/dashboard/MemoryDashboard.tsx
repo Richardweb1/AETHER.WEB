@@ -4,9 +4,27 @@ import { useState, useEffect } from "react";
 import { Search, Filter, ExternalLink, Calendar, Key, User } from "lucide-react";
 import { motion } from "framer-motion";
 
+interface MemoryListItem {
+  cid: string;
+  timestamp: number;
+  preview: string;
+}
+
+interface MemoryDetail {
+  cid?: string;
+  agent_id: string;
+  wallet_address: string;
+  interaction: {
+    prompt: string;
+    response: string;
+    timestamp: number;
+  };
+  metadata: Record<string, unknown>;
+}
+
 export default function MemoryDashboard({ wallet }: { wallet: string }) {
-  const [memories, setMemories] = useState<any[]>([]);
-  const [selectedMemory, setSelectedMemory] = useState<any>(null);
+  const [memories, setMemories] = useState<MemoryListItem[]>([]);
+  const [selectedMemory, setSelectedMemory] = useState<MemoryDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 

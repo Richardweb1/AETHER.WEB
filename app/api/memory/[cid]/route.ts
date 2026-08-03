@@ -21,16 +21,18 @@ export async function GET(
       agent_id: entry.agent_id,
       wallet_address: entry.wallet_address,
       interaction: {
-        prompt: entry.preview.replace("...", ""),
-        response: "AI response stored on Shelby Protocol",
+        prompt: entry.prompt ?? entry.preview.replace("...", ""),
+        response: entry.response ?? "AI response stored on Shelby Protocol",
         timestamp: entry.timestamp
       },
       metadata: {
         source: "Shelby AI Memory MVP",
-        cid: entry.cid
+        cid: entry.cid,
+        blobName: entry.blobName,
+        ...entry.metadata,
       }
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }
