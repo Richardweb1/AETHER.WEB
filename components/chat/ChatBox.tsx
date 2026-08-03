@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 
 const SWAP_NETWORKS = [
-  { id: "aptos-testnet", label: "Aptos Testnet" },
   { id: "aptos-mainnet", label: "Aptos Mainnet" },
+  { id: "aptos-testnet", label: "Aptos Testnet" },
   { id: "shelbynet", label: "ShelbyNet" },
 ] as const;
 
@@ -115,7 +115,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
   const [swapAmount, setSwapAmount] = useState("");
   const [fromToken, setFromToken] = useState("APT");
   const [toToken, setToToken] = useState("USDC");
-  const [swapNetwork, setSwapNetwork] = useState<SwapNetwork>("aptos-testnet");
+  const [swapNetwork, setSwapNetwork] = useState<SwapNetwork>("aptos-mainnet");
   const [quote, setQuote] = useState<DexQuote | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
@@ -165,6 +165,14 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     }
     if (fromToken === toToken) {
       alert("Choose two different tokens.");
+      return;
+    }
+    if (swapNetwork === "aptos-testnet") {
+      addAssistantMessage({
+        role: "assistant",
+        content: "Aptos Testnet swap is disabled because the old Liquidswap router is not deployed on the current Aptos testnet. Choose Aptos Mainnet for real swaps.",
+        status: "error",
+      });
       return;
     }
     setIsQuoting(true);

@@ -114,7 +114,12 @@ const MAINNET_V05_PAIRS = new Set(["USDC-USDT", "USDT-USDC"]);
 
 export function getDexNetworks() {
   return [
-    { id: "aptos-testnet", label: "Aptos Testnet", executable: true },
+    {
+      id: "aptos-testnet",
+      label: "Aptos Testnet",
+      executable: false,
+      reason: "The old Liquidswap testnet router is not deployed on the current Aptos testnet.",
+    },
     { id: "aptos-mainnet", label: "Aptos Mainnet", executable: true },
     {
       id: "shelbynet",
@@ -225,6 +230,13 @@ export async function buildLiquidswapQuote(params: {
   slippage?: number;
 }): Promise<SwapQuote> {
   const network = params.network ?? "aptos-testnet";
+
+  if (network === "aptos-testnet") {
+    throw new Error(
+      "Aptos Testnet swap execution is disabled because the Liquidswap testnet router module is not deployed on the current Aptos testnet. Use Aptos Mainnet for real swaps, or configure a currently deployed Aptos testnet DEX/router."
+    );
+  }
+
   const tokens = TOKEN_SETS[network];
   const from = tokens[params.fromToken.toUpperCase()];
   const to = tokens[params.toToken.toUpperCase()];
