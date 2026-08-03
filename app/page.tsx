@@ -39,7 +39,7 @@ export default function Home() {
           <Zap className="w-3 h-3 text-yellow-500" />
           <span>Shelby Hot Storage: Active</span>
         </div>
-        <div>Network: Aptos Testnet</div>
+        <div>DEX: Aptos Mainnet</div>
         <div>SDK: 0.2.4</div>
       </div>
     </main>

@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Cpu, CheckCircle, Loader2, AlertCircle, ExternalLink, ArrowRightLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
+import { Network } from "@aptos-labs/ts-sdk";
 
 const SWAP_NETWORKS = [
   { id: "aptos-mainnet", label: "Aptos Mainnet" },
@@ -106,7 +107,7 @@ async function delay(ms: number) {
 }
 
 export default function ChatBox({ wallet }: { wallet: string }) {
-  const { signAndSubmitTransaction } = useWallet();
+  const { network, signAndSubmitTransaction, changeNetwork } = useWallet();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -158,6 +159,27 @@ export default function ChatBox({ wallet }: { wallet: string }) {
       },
     });
   };
+  const getExpectedWalletNetwork = (selectedNetwork: SwapNetwork) => {
+    if (selectedNetwork === "aptos-mainnet") return "mainnet";
+    if (selectedNetwork === "aptos-testnet") return "testnet";
+    return "shelbynet";
+  };
+  const getCurrentWalletNetwork = () => network?.name?.toString().toLowerCase() || "";
+  const walletMatchesSwapNetwork = (selectedNetwork: SwapNetwork) =>
+    getCurrentWalletNetwork() === getExpectedWalletNetwork(selectedNetwork);
+  const handleSwitchWalletNetwork = async () => {
+    try {
+      if (swapNetwork === "aptos-mainnet") await changeNetwork(Network.MAINNET);
+      if (swapNetwork === "aptos-testnet") await changeNetwork(Network.TESTNET);
+      if (swapNetwork === "shelbynet") await changeNetwork(Network.SHELBYNET);
+    } catch (error) {
+      addAssistantMessage({
+        role: "assistant",
+        content: `Could not switch Petra automatically. Open Petra and switch to ${SWAP_NETWORKS.find((item) => item.id === swapNetwork)?.label}, then try again.\n${extractErrorMessage(error)}`,
+        status: "error",
+      });
+    }
+  };
   const handleQuote = async () => {
     if (!swapAmount.trim()) {
       alert("Enter an amount first.");
@@ -205,6 +227,12 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     if (!quote) return;
     setIsSwapping(true);
     try {
+      if (!walletMatchesSwapNetwork(quote.network)) {
+        throw new Error(
+          `Petra is connected to ${network?.name || "another network"}, but this quote is for ${SWAP_NETWORKS.find((item) => item.id === quote.network)?.label}. Switch Petra to ${SWAP_NETWORKS.find((item) => item.id === quote.network)?.label} and try again.`
+        );
+      }
+
       const preflightRes = await fetch("/api/swap/preflight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -344,13 +372,27 @@ export default function ChatBox({ wallet }: { wallet: string }) {
               </a>
             </div>
           )}
+          {wallet && !walletMatchesSwapNetwork(swapNetwork) && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-50">
+              <AlertCircle className="h-4 w-4 text-amber-300" />
+              <span>
+                Petra is on {network?.name || "another network"}. Switch it to {SWAP_NETWORKS.find((item) => item.id === swapNetwork)?.label}.
+              </span>
+              <button
+                onClick={handleSwitchWalletNetwork}
+                className="ml-auto rounded-lg border border-amber-300/30 px-2 py-1 text-amber-100 transition hover:border-amber-200/60"
+              >
+                Switch Wallet
+              </button>
+            </div>
+          )}
           {quote && (
             <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-cyan-50">
               <span className="font-mono">{`${quote.amount} ${quote.fromToken} -> ${quote.expectedOut} ${quote.toToken}`}</span>
               <span className="text-xs text-slate-400">Min: {quote.minOut} {quote.toToken}</span>
               <button
                 onClick={handleConfirmSwap}
-                disabled={isSwapping || !wallet}
+                disabled={isSwapping || !wallet || !walletMatchesSwapNetwork(quote.network)}
                 className="ml-auto rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-500 disabled:opacity-50"
               >
                 {isSwapping ? "Confirming..." : "Confirm Swap"}
