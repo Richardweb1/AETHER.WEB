@@ -2,17 +2,17 @@
 import { AptosWalletAdapterProvider } from "@aptos-labs/wallet-adapter-react";
 import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 
-const APTOS_TESTNET_NODE_URL = "https://fullnode.testnet.aptoslabs.com/v1";
-const aptosTestnet = new Aptos(
+const APTOS_MAINNET_NODE_URL = "https://fullnode.mainnet.aptoslabs.com/v1";
+const aptosMainnet = new Aptos(
   new AptosConfig({
-    network: Network.TESTNET,
-    fullnode: APTOS_TESTNET_NODE_URL,
+    network: Network.MAINNET,
+    fullnode: APTOS_MAINNET_NODE_URL,
   })
 );
 
 const transactionSubmitter = {
-  async submitTransaction(args: Parameters<typeof aptosTestnet.transaction.submit.simple>[0]) {
-    return aptosTestnet.transaction.submit.simple(args);
+  async submitTransaction(args: Parameters<typeof aptosMainnet.transaction.submit.simple>[0]) {
+    return aptosMainnet.transaction.submit.simple(args);
   },
 };
 
@@ -21,7 +21,7 @@ export default function WalletProvider({ children }: { children: React.ReactNode
     <AptosWalletAdapterProvider
       autoConnect={false}
       optInWallets={["Petra"]}
-      dappConfig={{ network: Network.TESTNET, transactionSubmitter }}
+      dappConfig={{ network: Network.MAINNET, transactionSubmitter }}
     >
       {children}
     </AptosWalletAdapterProvider>

@@ -15,6 +15,10 @@ export async function POST(req: Request) {
     if (!wallet) throw new Error("Connect wallet first.");
     if (!toToken?.type) throw new Error("Receive token is not supported on this network.");
 
+    if (network === "aptos-mainnet") {
+      return NextResponse.json({ success: true, needsRegistration: false });
+    }
+
     if (toToken.type === "0x1::aptos_coin::AptosCoin") {
       return NextResponse.json({ success: true, needsRegistration: false });
     }
