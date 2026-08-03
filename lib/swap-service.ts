@@ -32,6 +32,18 @@ const IGNORED_WORDS = new Set([
   "bdel",
   "convert",
   "exchange",
+  "i",
+  "want",
+  "wanna",
+  "need",
+  "do",
+  "make",
+  "ndir",
+  "bghit",
+  "f",
+  "fi",
+  "in",
+  "on",
   "to",
   "for",
   "l",
@@ -40,6 +52,9 @@ const IGNORED_WORDS = new Set([
   "min",
   "from",
   "aptos",
+  "testnet",
+  "mainnet",
+  "shelbynet",
 ]);
 
 function normalizeToken(word: string): string {
@@ -69,7 +84,7 @@ export function parseSwapIntent(prompt: string): SwapIntent | null {
 
   const uniqueTokens = Array.from(new Set(tokens));
   const fromToken = uniqueTokens[0] ?? "";
-  const toToken = uniqueTokens[1] ?? (fromToken === "APT" && amount ? "USDC" : "");
+  const toToken = uniqueTokens[1] ?? (fromToken === "APT" ? "USDC" : "");
   const network = parseSwapNetwork(normalized);
 
   return {
