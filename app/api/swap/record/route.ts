@@ -12,28 +12,29 @@ export async function POST(req: Request) {
     const amount = String(body.amount || "");
     const expectedOut = String(body.expectedOut || "");
     const network = String(body.network || "aptos-testnet");
+    const isReviewMode = Boolean(body.reviewMode || body.quote?.reviewMode);
 
     if (!txHash || !fromToken || !toToken || !amount) {
       return NextResponse.json({ success: false, error: "Missing swap transaction details." }, { status: 400 });
     }
 
     const response = [
-      "Swap executed and recorded on Shelby.",
+      isReviewMode ? "Review swap intent signed and recorded on Shelby." : "Swap executed and recorded on Shelby.",
       `Network: ${network}.`,
       `Request: ${amount} ${fromToken} -> ${toToken}.`,
       expectedOut ? `Quoted output: ${expectedOut} ${toToken}.` : "",
-      `Transaction: ${txHash}`,
+      isReviewMode ? `Signed intent: ${txHash}` : `Transaction: ${txHash}`,
     ].filter(Boolean).join("\n");
 
     const entry = buildMemoryEntry(
-      `executed swap ${amount} ${fromToken} to ${toToken}`,
+      `${isReviewMode ? "signed review swap" : "executed swap"} ${amount} ${fromToken} to ${toToken}`,
       response,
       walletAddr,
       {
         feature: "swap",
         dex: "Liquidswap",
         network,
-        status: "executed",
+        status: isReviewMode ? "signed_intent" : "executed",
         txHash,
         quote: body.quote ?? null,
       }
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
       agent_id: entry.agent_id,
       wallet_address: walletAddr,
       timestamp: result.timestamp,
-      preview: `Executed swap (${network}): ${amount} ${fromToken} -> ${toToken}`,
+      preview: `${isReviewMode ? "Signed review swap" : "Executed swap"} (${network}): ${amount} ${fromToken} -> ${toToken}`,
       prompt: entry.interaction.prompt,
       response,
       metadata: entry.metadata,

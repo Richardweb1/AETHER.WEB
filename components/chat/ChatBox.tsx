@@ -35,11 +35,13 @@ interface DexQuote {
   amount: string;
   expectedOut: string;
   minOut: string;
+  executable?: boolean;
+  reviewMode?: boolean;
   payload: {
     function: `${string}::${string}::${string}`;
     type_arguments: string[];
     arguments: string[];
-  };
+  } | null;
 }
 
 interface ChatMessage {
@@ -107,7 +109,7 @@ async function delay(ms: number) {
 }
 
 export default function ChatBox({ wallet }: { wallet: string }) {
-  const { network, signAndSubmitTransaction, changeNetwork } = useWallet();
+  const { network, signAndSubmitTransaction, changeNetwork, signMessage } = useWallet();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -189,14 +191,6 @@ export default function ChatBox({ wallet }: { wallet: string }) {
       alert("Choose two different tokens.");
       return;
     }
-    if (swapNetwork === "aptos-testnet") {
-      addAssistantMessage({
-        role: "assistant",
-        content: "Aptos Testnet swap is disabled because the old Liquidswap router is not deployed on the current Aptos testnet. Choose Aptos Mainnet for real swaps.",
-        status: "error",
-      });
-      return;
-    }
     setIsQuoting(true);
     try {
       const res = await fetch("/api/swap/quote", {
@@ -207,9 +201,13 @@ export default function ChatBox({ wallet }: { wallet: string }) {
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       setQuote(data.quote);
+      const selectedLabel = SWAP_NETWORKS.find((network) => network.id === swapNetwork)?.label;
+      const quoteMessage = data.quote.reviewMode
+        ? `Review swap ready on ${selectedLabel}.\n${swapAmount} ${fromToken} -> ${toToken}\nConfirm will ask Petra to sign the swap intent and store it on Shelby.`
+        : `Liquidswap quote ready on ${selectedLabel}.\n${swapAmount} ${fromToken} -> about ${data.quote.expectedOut} ${toToken}\nMinimum after slippage: ${data.quote.minOut} ${toToken}`;
       addAssistantMessage({
         role: "assistant",
-        content: `Liquidswap quote ready on ${SWAP_NETWORKS.find((network) => network.id === swapNetwork)?.label}.\n${swapAmount} ${fromToken} -> about ${data.quote.expectedOut} ${toToken}\nMinimum after slippage: ${data.quote.minOut} ${toToken}`,
+        content: quoteMessage,
         status: "stored",
         swapIntent: { fromToken, toToken, amount: swapAmount, status: "recorded" },
       });
@@ -231,6 +229,59 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         throw new Error(
           `Petra is connected to ${network?.name || "another network"}, but this quote is for ${SWAP_NETWORKS.find((item) => item.id === quote.network)?.label}. Switch Petra to ${SWAP_NETWORKS.find((item) => item.id === quote.network)?.label} and try again.`
         );
+      }
+
+      if (quote.reviewMode || !quote.executable || !quote.payload) {
+        const nonce = Date.now().toString();
+        const message = [
+          "AETHER.WEB review swap",
+          `Network: ${quote.network}`,
+          `Wallet: ${wallet}`,
+          `Swap: ${quote.amount} ${quote.fromToken} to ${quote.toToken}`,
+          `Expected output: ${quote.expectedOut} ${quote.toToken}`,
+        ].join("\n");
+        addAssistantMessage({
+          role: "assistant",
+          content: `Signing review swap intent in Petra. This proves the wallet approved the ${SWAP_NETWORKS.find((item) => item.id === quote.network)?.label} swap request and stores it on Shelby.`,
+          status: "stored",
+        });
+        const signedIntent = await signMessage({
+          address: true,
+          application: true,
+          chainId: true,
+          message,
+          nonce,
+        });
+        const signature =
+          typeof signedIntent.signature === "string"
+            ? signedIntent.signature
+            : signedIntent.signature.toString();
+        const txHash = `signed-intent:${nonce}:${signature.slice(0, 18)}`;
+        const res = await fetch("/api/swap/record", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            wallet_address: wallet,
+            txHash,
+            network: quote.network,
+            fromToken: quote.fromToken,
+            toToken: quote.toToken,
+            amount: quote.amount,
+            expectedOut: quote.expectedOut,
+            quote: { ...quote, signedIntent },
+            reviewMode: true,
+          }),
+        });
+        const data = await res.json();
+        addAssistantMessage({
+          role: "assistant",
+          content: data.aiResponse || `Review swap signed and stored on Shelby.\nSignature: ${signature.slice(0, 24)}...`,
+          status: data.stored_on_shelby ? "stored" : "error",
+          blobName: data.blobName,
+          explorerUrl: data.explorerUrl,
+          swapIntent: { fromToken: quote.fromToken, toToken: quote.toToken, amount: quote.amount, status: "recorded" },
+        });
+        return;
       }
 
       const preflightRes = await fetch("/api/swap/preflight", {
@@ -389,13 +440,15 @@ export default function ChatBox({ wallet }: { wallet: string }) {
           {quote && (
             <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-cyan-50">
               <span className="font-mono">{`${quote.amount} ${quote.fromToken} -> ${quote.expectedOut} ${quote.toToken}`}</span>
-              <span className="text-xs text-slate-400">Min: {quote.minOut} {quote.toToken}</span>
+              <span className="text-xs text-slate-400">
+                {quote.reviewMode ? "Review signature" : `Min: ${quote.minOut} ${quote.toToken}`}
+              </span>
               <button
                 onClick={handleConfirmSwap}
                 disabled={isSwapping || !wallet || !walletMatchesSwapNetwork(quote.network)}
                 className="ml-auto rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-500 disabled:opacity-50"
               >
-                {isSwapping ? "Confirming..." : "Confirm Swap"}
+                {isSwapping ? "Confirming..." : quote.reviewMode ? "Sign Review Swap" : "Confirm Swap"}
               </button>
             </div>
           )}

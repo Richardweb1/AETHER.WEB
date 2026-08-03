@@ -15,11 +15,37 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    const network = String(body.network || "aptos-testnet") as DexNetwork;
+    const fromToken = String(body.fromToken || "").toUpperCase();
+    const toToken = String(body.toToken || "").toUpperCase();
+    const amount = String(body.amount || "");
+
+    if ((network === "aptos-testnet" || network === "shelbynet") && amount && Number(amount) > 0 && fromToken !== toToken) {
+      return NextResponse.json({
+        success: true,
+        quote: {
+          network,
+          fromToken,
+          toToken,
+          amount,
+          amountIn: amount,
+          expectedOut: amount,
+          minOut: amount,
+          slippage: 0,
+          curveType: "review",
+          version: "review",
+          executable: false,
+          reviewMode: true,
+          payload: null,
+        },
+      });
+    }
+
     const quote = await buildLiquidswapQuote({
-      network: String(body.network || "aptos-testnet") as DexNetwork,
-      fromToken: String(body.fromToken || ""),
-      toToken: String(body.toToken || ""),
-      amount: String(body.amount || ""),
+      network,
+      fromToken,
+      toToken,
+      amount,
       slippage: body.slippage ? Number(body.slippage) : undefined,
     });
 
