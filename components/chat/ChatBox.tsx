@@ -49,6 +49,53 @@ interface ChatMessage {
     status: "recorded" | "needs_confirmation";
   } | null;
 }
+
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const data = error as Record<string, unknown>;
+    const possibleMessage =
+      data.message ||
+      data.error ||
+      data.reason ||
+      (data.data && typeof data.data === "object" ? (data.data as Record<string, unknown>).message : undefined);
+
+    if (typeof possibleMessage === "string" && possibleMessage.trim()) return possibleMessage;
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return "Unknown wallet error.";
+    }
+  }
+
+  return "Unknown wallet error.";
+}
+
+function explainSwapError(error: unknown): string {
+  const message = extractErrorMessage(error);
+  const lower = message.toLowerCase();
+
+  if (lower.includes("rejected") || lower.includes("cancel") || lower.includes("user")) {
+    return `Swap cancelled in wallet.\n${message}`;
+  }
+
+  if (lower.includes("insufficient") || lower.includes("balance")) {
+    return `Swap failed because the wallet does not have enough funds on this network.\n${message}`;
+  }
+
+  if (lower.includes("coinstore") || lower.includes("coin store") || lower.includes("not published")) {
+    return `Swap failed because the receive token is not registered in this wallet yet. Open Petra on this network and add/register the receive coin, then try again.\n${message}`;
+  }
+
+  if (lower.includes("network") || lower.includes("chain")) {
+    return `Swap failed while switching or using the wallet network. Make sure Petra is connected to the same network as the quote.\n${message}`;
+  }
+
+  return `Swap was not confirmed.\n${message}`;
+}
+
 export default function ChatBox({ wallet }: { wallet: string }) {
   const { changeNetwork, signAndSubmitTransaction } = useWallet();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -122,7 +169,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     } catch (error) {
       addAssistantMessage({
         role: "assistant",
-        content: error instanceof Error ? error.message : "Could not get a DEX quote.",
+        content: extractErrorMessage(error),
         status: "error",
       });
     } finally {
@@ -142,6 +189,29 @@ export default function ChatBox({ wallet }: { wallet: string }) {
       if (quote.network === "shelbynet") {
         await changeNetwork(Network.SHELBYNET);
       }
+
+      const preflightRes = await fetch("/api/swap/preflight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet_address: wallet,
+          network: quote.network,
+          toToken: quote.toToken,
+        }),
+      });
+      const preflight = await preflightRes.json();
+      if (!preflight.success) throw new Error(preflight.error);
+
+      if (preflight.needsRegistration) {
+        addAssistantMessage({
+          role: "assistant",
+          content: `Registering ${quote.toToken} in your wallet first. Confirm this small setup transaction in Petra, then the swap will continue.`,
+          status: "stored",
+        });
+        await signAndSubmitTransaction({ data: preflight.payload });
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+
       const result = await signAndSubmitTransaction({
         data: {
           function: quote.payload.function,
@@ -176,7 +246,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     } catch (error) {
       addAssistantMessage({
         role: "assistant",
-        content: error instanceof Error ? error.message : "Swap was not confirmed.",
+        content: explainSwapError(error),
         status: "error",
       });
     } finally {
@@ -288,7 +358,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
                   </div>
                 )}
                 {m.status === "stored" && m.blobName && (<div className="mt-3 pt-2 border-t border-white/10 space-y-1"><div className="flex items-center justify-between text-[10px] text-emerald-400"><span className="flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Stored on Shelby</span>{m.explorerUrl && (<a href={m.explorerUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:underline">View <ExternalLink className="w-3 h-3" /></a>)}</div><div className="text-[9px] text-slate-500 font-mono truncate">{m.blobName}</div></div>)}
-                {m.status === "error" && (<div className="mt-3 pt-2 border-t border-white/10 flex items-center gap-2 text-[10px] text-red-400"><AlertCircle className="w-3 h-3" /> Storage failed</div>)}
+                {m.status === "error" && (<div className="mt-3 pt-2 border-t border-white/10 flex items-center gap-2 text-[10px] text-red-400"><AlertCircle className="w-3 h-3" /> Action failed</div>)}
               </div>
             </motion.div>
           ))}

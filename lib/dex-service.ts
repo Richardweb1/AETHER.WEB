@@ -207,6 +207,16 @@ export function getSupportedDexTokens(network: DexNetwork = "aptos-testnet"): De
   return Object.values(TOKEN_SETS[network]).filter((token) => token.type);
 }
 
+export function getDexToken(network: DexNetwork, symbol: string): DexToken | null {
+  return TOKEN_SETS[network][symbol.toUpperCase()] || null;
+}
+
+export function getDexNodeUrl(network: DexNetwork): string {
+  if (network === "aptos-mainnet") return MAINNET_NODE_URL;
+  if (network === "shelbynet") return SHELBY_NODE_URL;
+  return TESTNET_NODE_URL;
+}
+
 export async function buildLiquidswapQuote(params: {
   network?: DexNetwork;
   fromToken: string;
