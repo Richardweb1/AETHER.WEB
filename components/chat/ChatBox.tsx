@@ -3,7 +3,6 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Cpu, CheckCircle, Loader2, AlertCircle, ExternalLink, ArrowRightLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { Network } from "@aptos-labs/ts-sdk";
 
 const SWAP_NETWORKS = [
   { id: "aptos-testnet", label: "Aptos Testnet" },
@@ -117,7 +116,7 @@ async function delay(ms: number) {
 }
 
 export default function ChatBox({ wallet }: { wallet: string }) {
-  const { changeNetwork, signAndSubmitTransaction } = useWallet();
+  const { signAndSubmitTransaction } = useWallet();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -229,16 +228,6 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     if (!quote) return;
     setIsSwapping(true);
     try {
-      if (quote.network === "aptos-testnet") {
-        await changeNetwork(Network.TESTNET);
-      }
-      if (quote.network === "aptos-mainnet") {
-        await changeNetwork(Network.MAINNET);
-      }
-      if (quote.network === "shelbynet") {
-        await changeNetwork(Network.SHELBYNET);
-      }
-
       const preflightRes = await fetch("/api/swap/preflight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
