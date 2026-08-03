@@ -22,7 +22,7 @@ const SHELBYNET_APT_FAUCET_URL = "https://faucet.shelbynet.shelby.xyz";
 const SHELBYNET_USD_FAUCET_URL = "https://docs.shelby.xyz/apis/faucet/shelbyusd";
 
 type WalletPayload = {
-  function: `${string}::${string}::${string}`;
+  function: `${string}::${string}::${string}` | "0x1::managed_coin::register";
   typeArguments: string[];
   functionArguments: string[];
 };

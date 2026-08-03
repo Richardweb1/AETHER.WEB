@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       needsRegistration: true,
       token: toToken.symbol,
       payload: {
-        function: "0x1::coin::register",
+        function: "0x1::managed_coin::register",
         typeArguments: [toToken.type],
         functionArguments: [],
       },
