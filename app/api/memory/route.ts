@@ -39,6 +39,14 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { wallet_address, prompt } = body;
+    const history = Array.isArray(body.history)
+      ? body.history
+          .filter((message: unknown) => {
+            const item = message as Record<string, unknown>;
+            return (item.role === "user" || item.role === "assistant") && typeof item.content === "string";
+          })
+          .slice(-8)
+      : [];
 
     if (!prompt) {
       return NextResponse.json({ success: false, error: "No prompt provided" }, { status: 400 });
@@ -58,7 +66,7 @@ export async function POST(req: Request) {
     }
 
     const swapIntent = parseSwapIntent(prompt);
-    const aiResponse = swapIntent ? buildSwapResponse(swapIntent) : await generateAIResponse(prompt);
+    const aiResponse = swapIntent ? buildSwapResponse(swapIntent) : await generateAIResponse(prompt, history);
     const entry = buildMemoryEntry(prompt, aiResponse, walletAddr, swapIntent ? { feature: "swap", swap: swapIntent } : {});
     const result = await storeMemory(entry);
 

@@ -4,6 +4,9 @@ const SYSTEM_PROMPT = `You are Shelby AI, an intelligent memory-enabled AI assis
 
 Your role:
 - Answer user questions helpfully and accurately
+- Act like a small product agent: infer the user's goal, prepare the next useful step, and ask only for missing details
+- If the user asks for a swap, explain what is ready in the DEX panel and what they must confirm
+- If the user asks for storage or memory, explain that the result is stored on Shelby and what can be retrieved
 - You are aware that every interaction is being stored on decentralized storage (Shelby Protocol) for permanent, verifiable recall
 - Keep responses concise but informative (2-4 sentences)
 - Be friendly and professional
@@ -14,16 +17,29 @@ Technical context:
 - Your memory persists across sessions via Shelby storage
 - You are agent "Shelby-Alpha-01"`;
 
-export async function generateAIResponse(prompt: string): Promise<string> {
+type ChatHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export async function generateAIResponse(prompt: string, history: ChatHistoryMessage[] = []): Promise<string> {
   if (OPENROUTER_API_KEY) {
-    const result = await callOpenRouter(prompt);
+    const result = await callOpenRouter(prompt, history);
     if (result) return result;
   }
   return smartFallback(prompt);
 }
 
-async function callOpenRouter(prompt: string): Promise<string | null> {
+async function callOpenRouter(prompt: string, history: ChatHistoryMessage[]): Promise<string | null> {
   try {
+    const recentHistory = history
+      .slice(-8)
+      .filter((message) => message.content?.trim())
+      .map((message) => ({
+        role: message.role,
+        content: message.content.slice(0, 800),
+      }));
+
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -36,10 +52,11 @@ async function callOpenRouter(prompt: string): Promise<string | null> {
         model: "meta-llama/llama-3.3-8b-instruct:free",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
+          ...recentHistory,
           { role: "user", content: prompt }
         ],
-        max_tokens: 200,
-        temperature: 0.7
+        max_tokens: 320,
+        temperature: 0.45
       })
     });
 
@@ -60,16 +77,16 @@ function smartFallback(prompt: string): string {
   const lower = prompt.toLowerCase();
 
   if (lower.includes("shelby") || lower.includes("protocol")) {
-    return "Shelby Protocol is decentralized hot storage built on Aptos by Aptos Labs & Jump Crypto. Every interaction is stored as a verifiable blob on-chain.";
+    return "Shelby Protocol is decentralized hot storage built on Aptos by Aptos Labs and Jump Crypto. I will store this interaction on Shelby so it can be retrieved later from the Storage tab.";
   }
   if (lower.includes("hello") || lower.includes("hi") || lower.includes("hey") || lower.includes("salam")) {
-    return "Hello! I'm Shelby AI — your memory-enabled assistant. Every conversation is stored permanently on Shelby Protocol (Aptos Testnet). Ask me anything!";
+    return "Salam, I am Shelby AI. Tell me what you want to do, and I will prepare the next step in chat or in the DEX panel, then store the result on Shelby.";
   }
   if (lower.includes("memory") || lower.includes("remember")) {
-    return "Every conversation we have is stored as a JSON blob on Shelby's decentralized storage with a verifiable transaction on Aptos.";
+    return "I can remember this for you. The interaction is stored as a Shelby JSON memory with the wallet address, prompt, response, and metadata.";
   }
   if (lower.includes("aptos") || lower.includes("blockchain")) {
     return "Aptos provides the coordination layer for Shelby Protocol with sub-second finality, making verifiable AI memory possible.";
   }
-  return "I've processed your message and stored this interaction on Shelby Protocol. What else would you like to know?";
+  return "I understood your request and stored it on Shelby. Add any missing details, like amount, token, network, or destination, and I will prepare the next step.";
 }

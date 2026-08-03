@@ -54,6 +54,7 @@ interface ChatMessage {
     fromToken: string;
     toToken: string;
     amount: string;
+    network?: SwapNetwork | "";
     status: "recorded" | "needs_confirmation";
   } | null;
 }
@@ -139,9 +140,14 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     setIsLoading(true);
     setMessages(prev => [...prev, { role: "assistant", content: "", status: "thinking" }]);
     try {
-      const res = await fetch("/api/memory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet_address: activeWallet, prompt: promptText }) });
+      const history = messages
+        .filter((message) => message.content?.trim())
+        .slice(-8)
+        .map((message) => ({ role: message.role, content: message.content }));
+      const res = await fetch("/api/memory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet_address: activeWallet, prompt: promptText, history }) });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
+      applySwapIntent(data.swapIntent);
       setMessages(prev => { const updated = [...prev]; const idx = updated.findIndex(m => m.status === "thinking"); if (idx !== -1) updated[idx] = { role: "assistant", content: data.aiResponse, status: "storing", swapIntent: data.swapIntent }; return updated; });
       await new Promise(r => setTimeout(r, 1000));
       setMessages(prev => { const updated = [...prev]; const idx = updated.findIndex(m => m.status === "storing"); if (idx !== -1) updated[idx] = { role: "assistant", content: data.aiResponse, status: data.stored_on_shelby ? "stored" : "error", blobName: data.blobName, explorerUrl: data.explorerUrl, swapIntent: data.swapIntent }; return updated; });
@@ -162,6 +168,18 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         maxGasAmount: 20000,
       },
     });
+  };
+  const applySwapIntent = (intent: ChatMessage["swapIntent"]) => {
+    if (!intent) return;
+    const requestedNetwork = intent.network && SWAP_NETWORKS.some((item) => item.id === intent.network)
+      ? intent.network
+      : swapNetwork;
+    const tokens = SWAP_TOKENS[requestedNetwork];
+
+    setSwapNetwork(requestedNetwork);
+    if (intent.amount) setSwapAmount(intent.amount);
+    if (intent.fromToken && tokens.includes(intent.fromToken)) setFromToken(intent.fromToken);
+    if (intent.toToken && tokens.includes(intent.toToken)) setToToken(intent.toToken);
   };
   const getExpectedWalletNetwork = (selectedNetwork: SwapNetwork) => {
     if (selectedNetwork === "aptos-mainnet") return "mainnet";
@@ -215,7 +233,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         role: "assistant",
         content: quoteMessage,
         status: "stored",
-        swapIntent: { fromToken, toToken, amount: swapAmount, status: "recorded" },
+        swapIntent: { fromToken, toToken, amount: swapAmount, network: swapNetwork, status: "recorded" },
       });
     } catch (error) {
       addAssistantMessage({
@@ -285,7 +303,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
           status: data.stored_on_shelby ? "stored" : "error",
           blobName: data.blobName,
           explorerUrl: data.explorerUrl,
-          swapIntent: { fromToken: quote.fromToken, toToken: quote.toToken, amount: quote.amount, status: "recorded" },
+          swapIntent: { fromToken: quote.fromToken, toToken: quote.toToken, amount: quote.amount, network: quote.network, status: "recorded" },
         });
         return;
       }
@@ -344,7 +362,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         status: data.stored_on_shelby ? "stored" : "error",
         blobName: data.blobName,
         explorerUrl: data.explorerUrl,
-        swapIntent: { fromToken: quote.fromToken, toToken: quote.toToken, amount: quote.amount, status: "recorded" },
+        swapIntent: { fromToken: quote.fromToken, toToken: quote.toToken, amount: quote.amount, network: quote.network, status: "recorded" },
       });
     } catch (error) {
       addAssistantMessage({
@@ -471,6 +489,11 @@ export default function ChatBox({ wallet }: { wallet: string }) {
                     <span className="font-mono">
                       {m.swapIntent.amount || "?"} {m.swapIntent.fromToken || "?"} to {m.swapIntent.toToken || "?"}
                     </span>
+                    {m.swapIntent.network && (
+                      <span className="text-[10px] text-cyan-300/70">
+                        {SWAP_NETWORKS.find((item) => item.id === m.swapIntent?.network)?.label}
+                      </span>
+                    )}
                     <span className="ml-auto rounded bg-cyan-400/10 px-2 py-1 text-[10px] uppercase text-cyan-300">
                       {m.swapIntent.status === "recorded" ? "Recorded" : "Needs details"}
                     </span>
