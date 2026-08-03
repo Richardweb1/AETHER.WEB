@@ -17,9 +17,33 @@ const TOKEN_ALIASES: Record<string, string> = {
   eth: "ETH",
   btc: "BTC",
   wbtc: "WBTC",
+  sol: "SOL",
+  sui: "SUI",
+  thl: "THL",
+  cake: "CAKE",
+  move: "MOVE",
 };
 
 const SWAP_KEYWORDS = ["swap", "swapi", "بدل", "bdel", "convert", "exchange"];
+const IGNORED_WORDS = new Set([
+  "swap",
+  "swapi",
+  "bdel",
+  "convert",
+  "exchange",
+  "to",
+  "for",
+  "l",
+  "ila",
+  "men",
+  "min",
+  "from",
+  "aptos",
+]);
+
+function normalizeToken(word: string): string {
+  return TOKEN_ALIASES[word] ?? word.toUpperCase();
+}
 
 export function parseSwapIntent(prompt: string): SwapIntent | null {
   const normalized = prompt.toLowerCase().replace(/[,،]/g, " ");
@@ -31,12 +55,13 @@ export function parseSwapIntent(prompt: string): SwapIntent | null {
   const amount = normalized.match(/(\d+(?:\.\d+)?)/)?.[1] ?? "";
   const tokenWords = normalized.match(/[a-z][a-z0-9]{1,12}/g) ?? [];
   const tokens = tokenWords
-    .map((word) => TOKEN_ALIASES[word] ?? word.toUpperCase())
-    .filter((word) => Object.values(TOKEN_ALIASES).includes(word));
+    .filter((word) => !IGNORED_WORDS.has(word) || word === "aptos")
+    .map(normalizeToken)
+    .filter((word) => /^[A-Z0-9]{2,12}$/.test(word));
 
   const uniqueTokens = Array.from(new Set(tokens));
   const fromToken = uniqueTokens[0] ?? "";
-  const toToken = uniqueTokens[1] ?? "";
+  const toToken = uniqueTokens[1] ?? (fromToken === "APT" && amount ? "USDC" : "");
 
   return {
     type: "swap_intent",
@@ -51,13 +76,12 @@ export function parseSwapIntent(prompt: string): SwapIntent | null {
 
 export function buildSwapResponse(intent: SwapIntent): string {
   if (intent.status === "needs_confirmation") {
-    return "I can record your swap on Shelby, but I need the full trade details first. Try: `swapi 10 APT to USDC`. On-chain execution is disabled until a trusted Aptos DEX router is configured.";
+    return "Swap mode is ready. Choose the missing amount or token in the swap box below, then record it on Shelby. On-chain execution still needs a trusted Aptos DEX router.";
   }
 
   return [
-    "Swap intent recorded on Shelby.",
+    "Swap request recorded on Shelby.",
     `Request: ${intent.amount} ${intent.fromToken} -> ${intent.toToken}.`,
-    "Status: recorded for audit/memory only; no tokens were moved yet.",
-    "Next step: connect a real Aptos DEX router/API to execute after wallet confirmation.",
+    "Status: ready for a DEX router step; no tokens were moved yet.",
   ].join("\n");
 }

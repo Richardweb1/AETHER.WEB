@@ -2,6 +2,9 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Cpu, CheckCircle, Loader2, AlertCircle, ExternalLink, ArrowRightLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const SWAP_TOKENS = ["APT", "USDC", "USDT", "WETH", "WBTC", "THL", "MOVE", "SUI", "SOL"];
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -19,14 +22,16 @@ export default function ChatBox({ wallet }: { wallet: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [swapAmount, setSwapAmount] = useState("");
+  const [fromToken, setFromToken] = useState("APT");
+  const [toToken, setToToken] = useState("USDC");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const submitPrompt = async (promptText: string) => {
+    if (!promptText.trim() || isLoading) return;
     if (!wallet) { alert("Please connect your Petra wallet first!"); return; }
-    const userMsg: ChatMessage = { role: "user", content: input };
+    const userMsg: ChatMessage = { role: "user", content: promptText };
     setMessages(prev => [...prev, userMsg]);
-    const promptText = input;
     setInput("");
     setIsLoading(true);
     setMessages(prev => [...prev, { role: "assistant", content: "", status: "thinking" }]);
@@ -41,10 +46,59 @@ export default function ChatBox({ wallet }: { wallet: string }) {
       setMessages(prev => { const updated = [...prev]; const idx = updated.findIndex(m => m.status === "thinking" || m.status === "storing"); if (idx !== -1) updated[idx] = { role: "assistant", content: "Something went wrong.", status: "error" }; return updated; });
     } finally { setIsLoading(false); }
   };
+  const handleSend = async () => {
+    await submitPrompt(input);
+  };
+  const handleSwapSubmit = async () => {
+    if (!swapAmount.trim()) {
+      alert("Enter an amount first.");
+      return;
+    }
+    await submitPrompt(`swap ${swapAmount} ${fromToken} to ${toToken}`);
+  };
   return (
     <div className="flex-1 flex flex-col glass rounded-2xl overflow-hidden min-h-[500px]">
       <div className="flex-1 p-6 overflow-y-auto space-y-4">
-        {messages.length === 0 && (<div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{wallet ? "Start a conversation. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
+        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-cyan-100">
+            <ArrowRightLeft className="h-4 w-4 text-cyan-300" />
+            Swap
+          </div>
+          <div className="grid gap-3 md:grid-cols-[1fr_120px_120px_auto]">
+            <input
+              value={swapAmount}
+              onChange={(e) => setSwapAmount(e.target.value)}
+              placeholder="Amount"
+              inputMode="decimal"
+              disabled={isLoading || !wallet}
+              className="min-w-0 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none transition focus:border-cyan-400/60 disabled:opacity-50"
+            />
+            <select
+              value={fromToken}
+              onChange={(e) => setFromToken(e.target.value)}
+              disabled={isLoading || !wallet}
+              className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none transition focus:border-cyan-400/60 disabled:opacity-50"
+            >
+              {SWAP_TOKENS.map((token) => <option key={token} value={token}>{token}</option>)}
+            </select>
+            <select
+              value={toToken}
+              onChange={(e) => setToToken(e.target.value)}
+              disabled={isLoading || !wallet}
+              className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none transition focus:border-cyan-400/60 disabled:opacity-50"
+            >
+              {SWAP_TOKENS.map((token) => <option key={token} value={token}>{token}</option>)}
+            </select>
+            <button
+              onClick={handleSwapSubmit}
+              disabled={isLoading || !wallet || fromToken === toToken}
+              className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-50"
+            >
+              Record Swap
+            </button>
+          </div>
+        </div>
+        {messages.length === 0 && (<div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{wallet ? "Start a conversation or record a swap. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
         <AnimatePresence>
           {messages.map((m, idx) => (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={idx} className={"flex " + (m.role === "user" ? "justify-end" : "justify-start")}>
