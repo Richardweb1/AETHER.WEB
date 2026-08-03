@@ -28,6 +28,16 @@ type WalletPayload = {
   functionArguments: string[];
 };
 
+type PetraProvider = {
+  signAndSubmitTransaction?: (payload: unknown) => Promise<{ hash?: string }>;
+};
+
+declare global {
+  interface Window {
+    aptos?: PetraProvider;
+  }
+}
+
 interface DexQuote {
   network: SwapNetwork;
   fromToken: string;
@@ -58,7 +68,7 @@ interface ChatMessage {
 
 function extractErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
-  if (typeof error === "string") return error;
+  if (typeof error === "string" && error.trim()) return error;
   if (error && typeof error === "object") {
     const data = error as Record<string, unknown>;
     const possibleMessage =
@@ -76,7 +86,7 @@ function extractErrorMessage(error: unknown): string {
     }
   }
 
-  return "Unknown wallet error.";
+  return "The wallet rejected the request without returning a reason.";
 }
 
 function explainSwapError(error: unknown): string {
@@ -152,12 +162,33 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     setMessages(prev => [...prev, message]);
   };
   const submitWalletPayload = async (payload: WalletPayload) => {
-    return signAndSubmitTransaction({
-      data: payload,
-      options: {
-        maxGasAmount: 20000,
-      },
-    });
+    try {
+      return await signAndSubmitTransaction({
+        data: payload,
+        options: {
+          maxGasAmount: 20000,
+        },
+      });
+    } catch (adapterError) {
+      if (!window.aptos?.signAndSubmitTransaction) throw adapterError;
+
+      const legacyPayload = {
+        type: "entry_function_payload",
+        function: payload.function,
+        type_arguments: payload.typeArguments,
+        arguments: payload.functionArguments,
+      };
+
+      try {
+        const directResult = await window.aptos.signAndSubmitTransaction(legacyPayload);
+        if (directResult?.hash) return { hash: directResult.hash };
+      } catch {
+        const directResult = await window.aptos.signAndSubmitTransaction({ payload: legacyPayload });
+        if (directResult?.hash) return { hash: directResult.hash };
+      }
+
+      throw adapterError;
+    }
   };
   const handleQuote = async () => {
     if (!swapAmount.trim()) {
