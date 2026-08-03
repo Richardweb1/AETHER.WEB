@@ -22,6 +22,12 @@ const SWAP_TOKENS: Record<SwapNetwork, string[]> = {
 const SHELBYNET_APT_FAUCET_URL = "https://faucet.shelbynet.shelby.xyz";
 const SHELBYNET_USD_FAUCET_URL = "https://docs.shelby.xyz/apis/faucet/shelbyusd";
 
+type WalletPayload = {
+  function: `${string}::${string}::${string}`;
+  typeArguments: string[];
+  functionArguments: string[];
+};
+
 interface DexQuote {
   network: SwapNetwork;
   fromToken: string;
@@ -96,6 +102,10 @@ function explainSwapError(error: unknown): string {
   return `Swap was not confirmed.\n${message}`;
 }
 
+async function delay(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export default function ChatBox({ wallet }: { wallet: string }) {
   const { changeNetwork, signAndSubmitTransaction } = useWallet();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -140,6 +150,14 @@ export default function ChatBox({ wallet }: { wallet: string }) {
   };
   const addAssistantMessage = (message: ChatMessage) => {
     setMessages(prev => [...prev, message]);
+  };
+  const submitWalletPayload = async (payload: WalletPayload) => {
+    return signAndSubmitTransaction({
+      data: payload,
+      options: {
+        maxGasAmount: 20000,
+      },
+    });
   };
   const handleQuote = async () => {
     if (!swapAmount.trim()) {
@@ -208,16 +226,19 @@ export default function ChatBox({ wallet }: { wallet: string }) {
           content: `Registering ${quote.toToken} in your wallet first. Confirm this small setup transaction in Petra, then the swap will continue.`,
           status: "stored",
         });
-        await signAndSubmitTransaction({ data: preflight.payload });
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const registerResult = await submitWalletPayload(preflight.payload);
+        addAssistantMessage({
+          role: "assistant",
+          content: `Token registration submitted.\nTransaction: ${registerResult.hash}\nNow sending the swap transaction.`,
+          status: "stored",
+        });
+        await delay(5000);
       }
 
-      const result = await signAndSubmitTransaction({
-        data: {
-          function: quote.payload.function,
-          typeArguments: quote.payload.type_arguments,
-          functionArguments: quote.payload.arguments,
-        },
+      const result = await submitWalletPayload({
+        function: quote.payload.function,
+        typeArguments: quote.payload.type_arguments,
+        functionArguments: quote.payload.arguments,
       });
       const txHash = result.hash;
       const res = await fetch("/api/swap/record", {
