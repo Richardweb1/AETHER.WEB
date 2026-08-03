@@ -27,16 +27,6 @@ type WalletPayload = {
   functionArguments: string[];
 };
 
-type PetraProvider = {
-  signAndSubmitTransaction?: (payload: unknown) => Promise<{ hash?: string }>;
-};
-
-declare global {
-  interface Window {
-    aptos?: PetraProvider;
-  }
-}
-
 interface DexQuote {
   network: SwapNetwork;
   fromToken: string;
@@ -161,33 +151,12 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     setMessages(prev => [...prev, message]);
   };
   const submitWalletPayload = async (payload: WalletPayload) => {
-    try {
-      return await signAndSubmitTransaction({
-        data: payload,
-        options: {
-          maxGasAmount: 20000,
-        },
-      });
-    } catch (adapterError) {
-      if (!window.aptos?.signAndSubmitTransaction) throw adapterError;
-
-      const legacyPayload = {
-        type: "entry_function_payload",
-        function: payload.function,
-        type_arguments: payload.typeArguments,
-        arguments: payload.functionArguments,
-      };
-
-      try {
-        const directResult = await window.aptos.signAndSubmitTransaction(legacyPayload);
-        if (directResult?.hash) return { hash: directResult.hash };
-      } catch {
-        const directResult = await window.aptos.signAndSubmitTransaction({ payload: legacyPayload });
-        if (directResult?.hash) return { hash: directResult.hash };
-      }
-
-      throw adapterError;
-    }
+    return signAndSubmitTransaction({
+      data: payload,
+      options: {
+        maxGasAmount: 20000,
+      },
+    });
   };
   const handleQuote = async () => {
     if (!swapAmount.trim()) {
