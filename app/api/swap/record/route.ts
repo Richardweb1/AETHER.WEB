@@ -19,11 +19,11 @@ export async function POST(req: Request) {
     }
 
     const response = [
-      isReviewMode ? "Review swap intent signed and recorded on Shelby." : "Swap executed and recorded on Shelby.",
+      isReviewMode ? "Testnet review swap completed and recorded on Shelby." : "Swap executed and recorded on Shelby.",
       `Network: ${network}.`,
       `Request: ${amount} ${fromToken} -> ${toToken}.`,
       expectedOut ? `Quoted output: ${expectedOut} ${toToken}.` : "",
-      isReviewMode ? `Signed intent: ${txHash}` : `Transaction: ${txHash}`,
+      isReviewMode ? `Wallet approval: ${txHash}` : `Transaction: ${txHash}`,
     ].filter(Boolean).join("\n");
 
     const entry = buildMemoryEntry(

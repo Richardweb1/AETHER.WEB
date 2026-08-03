@@ -227,7 +227,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
       setQuote(data.quote);
       const selectedLabel = SWAP_NETWORKS.find((network) => network.id === swapNetwork)?.label;
       const quoteMessage = data.quote.reviewMode
-        ? `Review swap ready on ${selectedLabel}.\n${swapAmount} ${fromToken} -> ${toToken}\nConfirm will ask Petra to sign the swap intent and store it on Shelby.`
+        ? `Testnet review swap ready on ${selectedLabel}.\n${swapAmount} ${fromToken} -> ${toToken}\nApprove once in Petra to complete and store it on Shelby.`
         : `Liquidswap quote ready on ${selectedLabel}.\n${swapAmount} ${fromToken} -> about ${data.quote.expectedOut} ${toToken}\nMinimum after slippage: ${data.quote.minOut} ${toToken}`;
       addAssistantMessage({
         role: "assistant",
@@ -266,7 +266,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         ].join("\n");
         addAssistantMessage({
           role: "assistant",
-          content: `Signing review swap intent in Petra. This proves the wallet approved the ${SWAP_NETWORKS.find((item) => item.id === quote.network)?.label} swap request and stores it on Shelby.`,
+          content: `Approving ${SWAP_NETWORKS.find((item) => item.id === quote.network)?.label} review swap in Petra. After approval, the completed review swap is stored on Shelby.`,
           status: "stored",
         });
         const signedIntent = await signMessage({
@@ -299,12 +299,13 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         const data = await res.json();
         addAssistantMessage({
           role: "assistant",
-          content: data.aiResponse || `Review swap signed and stored on Shelby.\nSignature: ${signature.slice(0, 24)}...`,
+          content: data.aiResponse || `Testnet review swap completed and stored on Shelby.\nApproval: ${signature.slice(0, 24)}...`,
           status: data.stored_on_shelby ? "stored" : "error",
           blobName: data.blobName,
           explorerUrl: data.explorerUrl,
           swapIntent: { fromToken: quote.fromToken, toToken: quote.toToken, amount: quote.amount, network: quote.network, status: "recorded" },
         });
+        setQuote(null);
         return;
       }
 
@@ -364,6 +365,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         explorerUrl: data.explorerUrl,
         swapIntent: { fromToken: quote.fromToken, toToken: quote.toToken, amount: quote.amount, network: quote.network, status: "recorded" },
       });
+      setQuote(null);
     } catch (error) {
       addAssistantMessage({
         role: "assistant",
