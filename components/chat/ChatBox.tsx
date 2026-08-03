@@ -3,14 +3,21 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Cpu, CheckCircle, Loader2, AlertCircle, ExternalLink, ArrowRightLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
+import { Network } from "@aptos-labs/ts-sdk";
 
-const SWAP_TOKENS = ["APT", "USDC", "USDT"];
 const SWAP_NETWORKS = [
   { id: "aptos-testnet", label: "Aptos Testnet" },
+  { id: "aptos-mainnet", label: "Aptos Mainnet" },
   { id: "shelbynet", label: "ShelbyNet" },
 ] as const;
 
 type SwapNetwork = typeof SWAP_NETWORKS[number]["id"];
+
+const SWAP_TOKENS: Record<SwapNetwork, string[]> = {
+  "aptos-testnet": ["APT", "USDC", "USDT"],
+  "aptos-mainnet": ["APT", "USDC", "USDT", "WETH", "WBTC"],
+  shelbynet: ["APT", "USDC", "USDT"],
+};
 
 interface DexQuote {
   network: SwapNetwork;
@@ -40,7 +47,7 @@ interface ChatMessage {
   } | null;
 }
 export default function ChatBox({ wallet }: { wallet: string }) {
-  const { signAndSubmitTransaction } = useWallet();
+  const { changeNetwork, signAndSubmitTransaction } = useWallet();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -54,6 +61,11 @@ export default function ChatBox({ wallet }: { wallet: string }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { setQuote(null); }, [swapAmount, fromToken, toToken, swapNetwork]);
+  useEffect(() => {
+    const tokens = SWAP_TOKENS[swapNetwork];
+    if (!tokens.includes(fromToken)) setFromToken(tokens[0]);
+    if (!tokens.includes(toToken)) setToToken(tokens[1] ?? tokens[0]);
+  }, [swapNetwork, fromToken, toToken]);
   const submitPrompt = async (promptText: string) => {
     if (!promptText.trim() || isLoading) return;
     if (!wallet) { alert("Please connect your Petra wallet first!"); return; }
@@ -118,6 +130,12 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     if (!quote) return;
     setIsSwapping(true);
     try {
+      if (quote.network === "aptos-testnet") {
+        await changeNetwork(Network.TESTNET);
+      }
+      if (quote.network === "aptos-mainnet") {
+        await changeNetwork(Network.MAINNET);
+      }
       const result = await signAndSubmitTransaction({
         data: {
           function: quote.payload.function,
@@ -193,7 +211,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
               disabled={isLoading || !wallet}
               className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none transition focus:border-cyan-400/60 disabled:opacity-50"
             >
-              {SWAP_TOKENS.map((token) => <option key={token} value={token}>{token}</option>)}
+              {SWAP_TOKENS[swapNetwork].map((token) => <option key={token} value={token}>{token}</option>)}
             </select>
             <select
               value={toToken}
@@ -201,7 +219,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
               disabled={isLoading || !wallet}
               className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none transition focus:border-cyan-400/60 disabled:opacity-50"
             >
-              {SWAP_TOKENS.map((token) => <option key={token} value={token}>{token}</option>)}
+              {SWAP_TOKENS[swapNetwork].map((token) => <option key={token} value={token}>{token}</option>)}
             </select>
             <button
               onClick={handleQuote}
@@ -225,7 +243,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
             </div>
           )}
         </div>
-        {messages.length === 0 && (<div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{wallet ? "Start a conversation or swap on Aptos testnet/ShelbyNet. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
+        {messages.length === 0 && (<div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{wallet ? "Start a conversation or swap on the selected network. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
         <AnimatePresence>
           {messages.map((m, idx) => (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={idx} className={"flex " + (m.role === "user" ? "justify-end" : "justify-start")}>

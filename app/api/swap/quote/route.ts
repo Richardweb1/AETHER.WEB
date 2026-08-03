@@ -3,9 +3,14 @@ import { buildLiquidswapQuote, DexNetwork, getSupportedDexTokens } from "@/lib/d
 
 export async function GET() {
   return NextResponse.json({
-    tokens: getSupportedDexTokens(),
+    tokens: {
+      "aptos-testnet": getSupportedDexTokens("aptos-testnet"),
+      "aptos-mainnet": getSupportedDexTokens("aptos-mainnet"),
+      shelbynet: getSupportedDexTokens("shelbynet"),
+    },
     networks: [
       { id: "aptos-testnet", label: "Aptos Testnet", executable: true },
+      { id: "aptos-mainnet", label: "Aptos Mainnet", executable: true },
       { id: "shelbynet", label: "ShelbyNet", executable: Boolean(process.env.LIQUIDSWAP_SHELBYNET_ACCOUNT && process.env.LIQUIDSWAP_SHELBYNET_RESOURCE_ACCOUNT) },
     ],
   });
