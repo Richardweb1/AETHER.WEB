@@ -1,14 +1,21 @@
 import { NextResponse } from "next/server";
-import { buildLiquidswapQuote, getSupportedDexTokens } from "@/lib/dex-service";
+import { buildLiquidswapQuote, DexNetwork, getSupportedDexTokens } from "@/lib/dex-service";
 
 export async function GET() {
-  return NextResponse.json({ tokens: getSupportedDexTokens() });
+  return NextResponse.json({
+    tokens: getSupportedDexTokens(),
+    networks: [
+      { id: "aptos-testnet", label: "Aptos Testnet", executable: true },
+      { id: "shelbynet", label: "ShelbyNet", executable: Boolean(process.env.LIQUIDSWAP_SHELBYNET_ACCOUNT && process.env.LIQUIDSWAP_SHELBYNET_RESOURCE_ACCOUNT) },
+    ],
+  });
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const quote = await buildLiquidswapQuote({
+      network: String(body.network || "aptos-testnet") as DexNetwork,
       fromToken: String(body.fromToken || ""),
       toToken: String(body.toToken || ""),
       amount: String(body.amount || ""),

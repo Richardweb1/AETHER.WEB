@@ -1,6 +1,7 @@
 import { SDK, convertDecimalToFixedString, convertValueToDecimal } from "@pontem/liquidswap-sdk";
 
 type CurveType = "uncorrelated" | "stable";
+export type DexNetwork = "aptos-testnet" | "shelbynet";
 
 export interface DexToken {
   symbol: string;
@@ -9,6 +10,7 @@ export interface DexToken {
 }
 
 export interface SwapQuote {
+  network: DexNetwork;
   fromToken: string;
   toToken: string;
   amount: string;
@@ -26,12 +28,14 @@ export interface SwapQuote {
 }
 
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.testnet.aptoslabs.com/v1";
-export const DEX_NETWORK = "aptos-testnet";
+const SHELBY_NODE_URL = process.env.SHELBYNET_NODE_URL || "https://api.shelbynet.shelby.xyz/v1";
 const DEFAULT_SLIPPAGE = Number(process.env.DEX_SLIPPAGE || "0.005");
 const TESTNET_LIQUIDSWAP_ACCOUNT =
   process.env.LIQUIDSWAP_TESTNET_ACCOUNT || "0x43417434fd869edee76cca2a4d2301e528a1551b1d719b75c350c3c97d15b8b9";
 const TESTNET_RESOURCE_ACCOUNT =
   process.env.LIQUIDSWAP_TESTNET_RESOURCE_ACCOUNT || "0x385068db10693e06512ed54b1e6e8f1fb9945bb7a78c28a45585939ce953f99e";
+const SHELBY_LIQUIDSWAP_ACCOUNT = process.env.LIQUIDSWAP_SHELBYNET_ACCOUNT || "";
+const SHELBY_RESOURCE_ACCOUNT = process.env.LIQUIDSWAP_SHELBYNET_RESOURCE_ACCOUNT || "";
 
 export const DEX_TOKENS: Record<string, DexToken> = {
   APT: {
@@ -53,20 +57,42 @@ export const DEX_TOKENS: Record<string, DexToken> = {
 
 const STABLE_PAIRS = new Set(["USDC-USDT", "USDT-USDC"]);
 
-function getSdk() {
-  return new SDK({
+function getNetworkConfig(network: DexNetwork) {
+  if (network === "shelbynet") {
+    if (!SHELBY_LIQUIDSWAP_ACCOUNT || !SHELBY_RESOURCE_ACCOUNT) {
+      throw new Error("ShelbyNet swap is ready in the UI, but no ShelbyNet DEX router is configured yet. Deploy Liquidswap-compatible contracts on ShelbyNet, then set LIQUIDSWAP_SHELBYNET_ACCOUNT and LIQUIDSWAP_SHELBYNET_RESOURCE_ACCOUNT.");
+    }
+
+    return {
+      nodeUrl: SHELBY_NODE_URL,
+      moduleAccount: SHELBY_LIQUIDSWAP_ACCOUNT,
+      resourceAccount: SHELBY_RESOURCE_ACCOUNT,
+    };
+  }
+
+  return {
     nodeUrl: NODE_URL,
+    moduleAccount: TESTNET_LIQUIDSWAP_ACCOUNT,
+    resourceAccount: TESTNET_RESOURCE_ACCOUNT,
+  };
+}
+
+function getSdk(network: DexNetwork) {
+  const config = getNetworkConfig(network);
+
+  return new SDK({
+    nodeUrl: config.nodeUrl,
     networkOptions: {
       nativeToken: DEX_TOKENS.APT.type,
       modules: {
-        Scripts: `${TESTNET_LIQUIDSWAP_ACCOUNT}::scripts_v2`,
+        Scripts: `${config.moduleAccount}::scripts_v2`,
         CoinInfo: "0x1::coin::CoinInfo",
         CoinStore: "0x1::coin::CoinStore",
       },
-      resourceAccount: TESTNET_RESOURCE_ACCOUNT,
-      moduleAccount: TESTNET_LIQUIDSWAP_ACCOUNT,
-      resourceAccountV05: TESTNET_RESOURCE_ACCOUNT,
-      moduleAccountV05: TESTNET_LIQUIDSWAP_ACCOUNT,
+      resourceAccount: config.resourceAccount,
+      moduleAccount: config.moduleAccount,
+      resourceAccountV05: config.resourceAccount,
+      moduleAccountV05: config.moduleAccount,
     },
   });
 }
@@ -84,11 +110,13 @@ export function getSupportedDexTokens(): DexToken[] {
 }
 
 export async function buildLiquidswapQuote(params: {
+  network?: DexNetwork;
   fromToken: string;
   toToken: string;
   amount: string;
   slippage?: number;
 }): Promise<SwapQuote> {
+  const network = params.network ?? "aptos-testnet";
   const from = DEX_TOKENS[params.fromToken.toUpperCase()];
   const to = DEX_TOKENS[params.toToken.toUpperCase()];
   const slippage = params.slippage ?? DEFAULT_SLIPPAGE;
@@ -105,7 +133,7 @@ export async function buildLiquidswapQuote(params: {
     throw new Error("Enter a valid amount.");
   }
 
-  const sdk = getSdk();
+  const sdk = getSdk(network);
   const curveType = getCurveType(from.symbol, to.symbol);
   const amountIn = convertValueToDecimal(params.amount, from.decimals).toNumber();
   const expectedOutRaw = await sdk.Swap.calculateRates({
@@ -132,6 +160,7 @@ export async function buildLiquidswapQuote(params: {
   const minOutRaw = payload.arguments[1] ?? expectedOutRaw;
 
   return {
+    network,
     fromToken: from.symbol,
     toToken: to.symbol,
     amount: params.amount,

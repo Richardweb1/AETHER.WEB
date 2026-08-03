@@ -5,8 +5,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 
 const SWAP_TOKENS = ["APT", "USDC", "USDT"];
+const SWAP_NETWORKS = [
+  { id: "aptos-testnet", label: "Aptos Testnet" },
+  { id: "shelbynet", label: "ShelbyNet" },
+] as const;
+
+type SwapNetwork = typeof SWAP_NETWORKS[number]["id"];
 
 interface DexQuote {
+  network: SwapNetwork;
   fromToken: string;
   toToken: string;
   amount: string;
@@ -42,10 +49,11 @@ export default function ChatBox({ wallet }: { wallet: string }) {
   const [swapAmount, setSwapAmount] = useState("");
   const [fromToken, setFromToken] = useState("APT");
   const [toToken, setToToken] = useState("USDC");
+  const [swapNetwork, setSwapNetwork] = useState<SwapNetwork>("aptos-testnet");
   const [quote, setQuote] = useState<DexQuote | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-  useEffect(() => { setQuote(null); }, [swapAmount, fromToken, toToken]);
+  useEffect(() => { setQuote(null); }, [swapAmount, fromToken, toToken, swapNetwork]);
   const submitPrompt = async (promptText: string) => {
     if (!promptText.trim() || isLoading) return;
     if (!wallet) { alert("Please connect your Petra wallet first!"); return; }
@@ -85,14 +93,14 @@ export default function ChatBox({ wallet }: { wallet: string }) {
       const res = await fetch("/api/swap/quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fromToken, toToken, amount: swapAmount }),
+        body: JSON.stringify({ network: swapNetwork, fromToken, toToken, amount: swapAmount }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       setQuote(data.quote);
       addAssistantMessage({
         role: "assistant",
-        content: `Liquidswap quote ready.\n${swapAmount} ${fromToken} -> about ${data.quote.expectedOut} ${toToken}\nMinimum after slippage: ${data.quote.minOut} ${toToken}`,
+        content: `Liquidswap quote ready on ${SWAP_NETWORKS.find((network) => network.id === swapNetwork)?.label}.\n${swapAmount} ${fromToken} -> about ${data.quote.expectedOut} ${toToken}\nMinimum after slippage: ${data.quote.minOut} ${toToken}`,
         status: "stored",
         swapIntent: { fromToken, toToken, amount: swapAmount, status: "recorded" },
       });
@@ -124,6 +132,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         body: JSON.stringify({
           wallet_address: wallet,
           txHash,
+          network: quote.network,
           fromToken: quote.fromToken,
           toToken: quote.toToken,
           amount: quote.amount,
@@ -157,9 +166,19 @@ export default function ChatBox({ wallet }: { wallet: string }) {
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-cyan-100">
             <ArrowRightLeft className="h-4 w-4 text-cyan-300" />
             Liquidswap DEX
-            <span className="ml-auto text-[10px] font-normal uppercase tracking-wide text-cyan-300/70">Aptos testnet</span>
+            <span className="ml-auto text-[10px] font-normal uppercase tracking-wide text-cyan-300/70">
+              {SWAP_NETWORKS.find((network) => network.id === swapNetwork)?.label}
+            </span>
           </div>
-          <div className="grid gap-3 md:grid-cols-[1fr_120px_120px_auto]">
+          <div className="grid gap-3 md:grid-cols-[150px_1fr_120px_120px_auto]">
+            <select
+              value={swapNetwork}
+              onChange={(e) => setSwapNetwork(e.target.value as SwapNetwork)}
+              disabled={isLoading || !wallet}
+              className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none transition focus:border-cyan-400/60 disabled:opacity-50"
+            >
+              {SWAP_NETWORKS.map((network) => <option key={network.id} value={network.id}>{network.label}</option>)}
+            </select>
             <input
               value={swapAmount}
               onChange={(e) => setSwapAmount(e.target.value)}
@@ -206,7 +225,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
             </div>
           )}
         </div>
-        {messages.length === 0 && (<div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{wallet ? "Start a conversation or swap on Aptos testnet. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
+        {messages.length === 0 && (<div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{wallet ? "Start a conversation or swap on Aptos testnet/ShelbyNet. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
         <AnimatePresence>
           {messages.map((m, idx) => (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={idx} className={"flex " + (m.role === "user" ? "justify-end" : "justify-start")}>

@@ -11,6 +11,7 @@ export async function POST(req: Request) {
     const toToken = String(body.toToken || "");
     const amount = String(body.amount || "");
     const expectedOut = String(body.expectedOut || "");
+    const network = String(body.network || "aptos-testnet");
 
     if (!txHash || !fromToken || !toToken || !amount) {
       return NextResponse.json({ success: false, error: "Missing swap transaction details." }, { status: 400 });
@@ -18,6 +19,7 @@ export async function POST(req: Request) {
 
     const response = [
       "Swap executed and recorded on Shelby.",
+      `Network: ${network}.`,
       `Request: ${amount} ${fromToken} -> ${toToken}.`,
       expectedOut ? `Quoted output: ${expectedOut} ${toToken}.` : "",
       `Transaction: ${txHash}`,
@@ -30,6 +32,7 @@ export async function POST(req: Request) {
       {
         feature: "swap",
         dex: "Liquidswap",
+        network,
         status: "executed",
         txHash,
         quote: body.quote ?? null,
@@ -44,7 +47,7 @@ export async function POST(req: Request) {
       agent_id: entry.agent_id,
       wallet_address: walletAddr,
       timestamp: result.timestamp,
-      preview: `Executed swap: ${amount} ${fromToken} -> ${toToken}`,
+      preview: `Executed swap (${network}): ${amount} ${fromToken} -> ${toToken}`,
       prompt: entry.interaction.prompt,
       response,
       metadata: entry.metadata,
