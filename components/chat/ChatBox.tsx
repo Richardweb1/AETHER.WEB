@@ -4,7 +4,7 @@ import { Send, Cpu, CheckCircle, Loader2, AlertCircle, ExternalLink, ArrowRightL
 import { motion, AnimatePresence } from "framer-motion";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 
-const SWAP_TOKENS = ["APT", "USDC", "USDT", "WETH", "WBTC"];
+const SWAP_TOKENS = ["APT", "USDC", "USDT"];
 
 interface DexQuote {
   fromToken: string;
@@ -157,7 +157,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-cyan-100">
             <ArrowRightLeft className="h-4 w-4 text-cyan-300" />
             Liquidswap DEX
-            <span className="ml-auto text-[10px] font-normal uppercase tracking-wide text-cyan-300/70">Aptos mainnet</span>
+            <span className="ml-auto text-[10px] font-normal uppercase tracking-wide text-cyan-300/70">Aptos testnet</span>
           </div>
           <div className="grid gap-3 md:grid-cols-[1fr_120px_120px_auto]">
             <input
@@ -206,7 +206,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
             </div>
           )}
         </div>
-        {messages.length === 0 && (<div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{wallet ? "Start a conversation or record a swap. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
+        {messages.length === 0 && (<div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{wallet ? "Start a conversation or swap on Aptos testnet. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
         <AnimatePresence>
           {messages.map((m, idx) => (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={idx} className={"flex " + (m.role === "user" ? "justify-end" : "justify-start")}>

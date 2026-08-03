@@ -25,8 +25,13 @@ export interface SwapQuote {
   };
 }
 
-const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.mainnet.aptoslabs.com/v1";
+const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.testnet.aptoslabs.com/v1";
+export const DEX_NETWORK = "aptos-testnet";
 const DEFAULT_SLIPPAGE = Number(process.env.DEX_SLIPPAGE || "0.005");
+const TESTNET_LIQUIDSWAP_ACCOUNT =
+  process.env.LIQUIDSWAP_TESTNET_ACCOUNT || "0x43417434fd869edee76cca2a4d2301e528a1551b1d719b75c350c3c97d15b8b9";
+const TESTNET_RESOURCE_ACCOUNT =
+  process.env.LIQUIDSWAP_TESTNET_RESOURCE_ACCOUNT || "0x385068db10693e06512ed54b1e6e8f1fb9945bb7a78c28a45585939ce953f99e";
 
 export const DEX_TOKENS: Record<string, DexToken> = {
   APT: {
@@ -36,30 +41,34 @@ export const DEX_TOKENS: Record<string, DexToken> = {
   },
   USDC: {
     symbol: "USDC",
-    type: "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa::asset::USDC",
+    type: "0xb4d7b2466d211c1f4629e8340bb1a9e75e7f8fb38cc145c54c5c9f9d5017a318::coins_extended::USDC",
     decimals: 6,
   },
   USDT: {
     symbol: "USDT",
-    type: "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa::asset::USDT",
+    type: `${TESTNET_LIQUIDSWAP_ACCOUNT}::coins::USDT`,
     decimals: 6,
-  },
-  WETH: {
-    symbol: "WETH",
-    type: "0xcc8a89c8dce9693d354449f1f73e60e14e347417854f029db5bc8e7454008abb::coin::T",
-    decimals: 8,
-  },
-  WBTC: {
-    symbol: "WBTC",
-    type: "0x5e156f1207d0ebfa19a9eeff00d62a14a208c8f0d2a8f8d65077490e897a5b8d::coin::T",
-    decimals: 8,
   },
 };
 
 const STABLE_PAIRS = new Set(["USDC-USDT", "USDT-USDC"]);
 
 function getSdk() {
-  return new SDK({ nodeUrl: NODE_URL });
+  return new SDK({
+    nodeUrl: NODE_URL,
+    networkOptions: {
+      nativeToken: DEX_TOKENS.APT.type,
+      modules: {
+        Scripts: `${TESTNET_LIQUIDSWAP_ACCOUNT}::scripts_v2`,
+        CoinInfo: "0x1::coin::CoinInfo",
+        CoinStore: "0x1::coin::CoinStore",
+      },
+      resourceAccount: TESTNET_RESOURCE_ACCOUNT,
+      moduleAccount: TESTNET_LIQUIDSWAP_ACCOUNT,
+      resourceAccountV05: TESTNET_RESOURCE_ACCOUNT,
+      moduleAccountV05: TESTNET_LIQUIDSWAP_ACCOUNT,
+    },
+  });
 }
 
 function getCurveType(fromToken: string, toToken: string): CurveType {
