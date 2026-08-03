@@ -2,8 +2,22 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Cpu, CheckCircle, Loader2, AlertCircle, ExternalLink, ArrowRightLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useWallet } from "@aptos-labs/wallet-adapter-react";
 
-const SWAP_TOKENS = ["APT", "USDC", "USDT", "WETH", "WBTC", "THL", "MOVE", "SUI", "SOL"];
+const SWAP_TOKENS = ["APT", "USDC", "USDT", "WETH", "WBTC"];
+
+interface DexQuote {
+  fromToken: string;
+  toToken: string;
+  amount: string;
+  expectedOut: string;
+  minOut: string;
+  payload: {
+    function: `${string}::${string}::${string}`;
+    type_arguments: string[];
+    arguments: string[];
+  };
+}
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -19,14 +33,19 @@ interface ChatMessage {
   } | null;
 }
 export default function ChatBox({ wallet }: { wallet: string }) {
+  const { signAndSubmitTransaction } = useWallet();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isQuoting, setIsQuoting] = useState(false);
+  const [isSwapping, setIsSwapping] = useState(false);
   const [swapAmount, setSwapAmount] = useState("");
   const [fromToken, setFromToken] = useState("APT");
   const [toToken, setToToken] = useState("USDC");
+  const [quote, setQuote] = useState<DexQuote | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => { setQuote(null); }, [swapAmount, fromToken, toToken]);
   const submitPrompt = async (promptText: string) => {
     if (!promptText.trim() || isLoading) return;
     if (!wallet) { alert("Please connect your Petra wallet first!"); return; }
@@ -49,12 +68,87 @@ export default function ChatBox({ wallet }: { wallet: string }) {
   const handleSend = async () => {
     await submitPrompt(input);
   };
-  const handleSwapSubmit = async () => {
+  const addAssistantMessage = (message: ChatMessage) => {
+    setMessages(prev => [...prev, message]);
+  };
+  const handleQuote = async () => {
     if (!swapAmount.trim()) {
       alert("Enter an amount first.");
       return;
     }
-    await submitPrompt(`swap ${swapAmount} ${fromToken} to ${toToken}`);
+    if (fromToken === toToken) {
+      alert("Choose two different tokens.");
+      return;
+    }
+    setIsQuoting(true);
+    try {
+      const res = await fetch("/api/swap/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromToken, toToken, amount: swapAmount }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setQuote(data.quote);
+      addAssistantMessage({
+        role: "assistant",
+        content: `Liquidswap quote ready.\n${swapAmount} ${fromToken} -> about ${data.quote.expectedOut} ${toToken}\nMinimum after slippage: ${data.quote.minOut} ${toToken}`,
+        status: "stored",
+        swapIntent: { fromToken, toToken, amount: swapAmount, status: "recorded" },
+      });
+    } catch (error) {
+      addAssistantMessage({
+        role: "assistant",
+        content: error instanceof Error ? error.message : "Could not get a DEX quote.",
+        status: "error",
+      });
+    } finally {
+      setIsQuoting(false);
+    }
+  };
+  const handleConfirmSwap = async () => {
+    if (!quote) return;
+    setIsSwapping(true);
+    try {
+      const result = await signAndSubmitTransaction({
+        data: {
+          function: quote.payload.function,
+          typeArguments: quote.payload.type_arguments,
+          functionArguments: quote.payload.arguments,
+        },
+      });
+      const txHash = result.hash;
+      const res = await fetch("/api/swap/record", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet_address: wallet,
+          txHash,
+          fromToken: quote.fromToken,
+          toToken: quote.toToken,
+          amount: quote.amount,
+          expectedOut: quote.expectedOut,
+          quote,
+        }),
+      });
+      const data = await res.json();
+      addAssistantMessage({
+        role: "assistant",
+        content: data.aiResponse || `Swap submitted.\nTransaction: ${txHash}`,
+        status: data.stored_on_shelby ? "stored" : "error",
+        blobName: data.blobName,
+        explorerUrl: data.explorerUrl,
+        swapIntent: { fromToken: quote.fromToken, toToken: quote.toToken, amount: quote.amount, status: "recorded" },
+      });
+    } catch (error) {
+      addAssistantMessage({
+        role: "assistant",
+        content: error instanceof Error ? error.message : "Swap was not confirmed.",
+        status: "error",
+      });
+    } finally {
+      setIsSwapping(false);
+    }
   };
   return (
     <div className="flex-1 flex flex-col glass rounded-2xl overflow-hidden min-h-[500px]">
@@ -62,7 +156,8 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-cyan-100">
             <ArrowRightLeft className="h-4 w-4 text-cyan-300" />
-            Swap
+            Liquidswap DEX
+            <span className="ml-auto text-[10px] font-normal uppercase tracking-wide text-cyan-300/70">Aptos mainnet</span>
           </div>
           <div className="grid gap-3 md:grid-cols-[1fr_120px_120px_auto]">
             <input
@@ -90,13 +185,26 @@ export default function ChatBox({ wallet }: { wallet: string }) {
               {SWAP_TOKENS.map((token) => <option key={token} value={token}>{token}</option>)}
             </select>
             <button
-              onClick={handleSwapSubmit}
-              disabled={isLoading || !wallet || fromToken === toToken}
+              onClick={handleQuote}
+              disabled={isLoading || isQuoting || isSwapping || !wallet || fromToken === toToken}
               className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-50"
             >
-              Record Swap
+              {isQuoting ? "Quoting..." : "Get Quote"}
             </button>
           </div>
+          {quote && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-cyan-50">
+              <span className="font-mono">{`${quote.amount} ${quote.fromToken} -> ${quote.expectedOut} ${quote.toToken}`}</span>
+              <span className="text-xs text-slate-400">Min: {quote.minOut} {quote.toToken}</span>
+              <button
+                onClick={handleConfirmSwap}
+                disabled={isSwapping || !wallet}
+                className="ml-auto rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-500 disabled:opacity-50"
+              >
+                {isSwapping ? "Confirming..." : "Confirm Swap"}
+              </button>
+            </div>
+          )}
         </div>
         {messages.length === 0 && (<div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-4"><Cpu className="w-12 h-12 opacity-20" /><p className="text-center">{wallet ? "Start a conversation or record a swap. Every interaction is stored on Shelby." : "Connect your Petra wallet to start chatting."}</p></div>)}
         <AnimatePresence>
