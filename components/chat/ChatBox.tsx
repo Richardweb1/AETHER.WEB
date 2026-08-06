@@ -147,8 +147,10 @@ export default function ChatBox({ wallet }: { wallet: string }) {
         content:
           error instanceof Error
             ? error.message
-            : "Transfer was not completed.",
-        status: "error",
+            : "Transfer was not completed. You can retry the wallet confirmation.",
+        status: "action",
+        transferIntent: intent,
+        actionPrompt: promptText,
       });
     } finally {
       setIsLoading(false);
