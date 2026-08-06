@@ -4,7 +4,7 @@
 
 # AETHER.WEB
 
-Decentralized AI memory and wallet actions, built on Shelby Protocol.
+### Decentralized AI memory and wallet actions, built on Shelby Protocol.
 
 AETHER.WEB gives an AI agent a verifiable memory layer on Shelby hot storage. Every useful chat interaction can be saved as a JSON blob tied to the user's Aptos wallet, and the agent can also guide a user through real APT transfers with Petra.
 
