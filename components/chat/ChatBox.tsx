@@ -24,11 +24,51 @@ interface ChatMessage {
   actionPrompt?: string;
 }
 
+interface PendingTransfer {
+  token: "APT";
+  amount?: string;
+  recipient?: string;
+  prompt: string;
+}
+
+const APT_DECIMALS = 100_000_000;
+
+function extractAmount(input: string) {
+  return input.match(/\b([0-9]+(?:\.[0-9]{1,8})?)\s*(?:apt)?\b/i)?.[1];
+}
+
+function extractRecipient(input: string) {
+  return input.match(/\b(0x[a-fA-F0-9]{16,})\b/)?.[1];
+}
+
+function toOctas(amount: string) {
+  const [whole, fraction = ""] = amount.split(".");
+  const paddedFraction = fraction.padEnd(8, "0").slice(0, 8);
+  return (
+    BigInt(whole) * BigInt(APT_DECIMALS) +
+    BigInt(paddedFraction || "0")
+  ).toString();
+}
+
+function buildTransferIntentFromParts(
+  amount: string,
+  recipient: string
+): TransferIntent {
+  return {
+    action: "token_transfer",
+    token: "APT",
+    amount,
+    amountOctas: toOctas(amount),
+    recipient,
+  };
+}
+
 export default function ChatBox({ wallet }: { wallet: string }) {
   const { signAndSubmitTransaction } = useWallet();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingTransfer, setPendingTransfer] = useState<PendingTransfer | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -120,21 +160,115 @@ export default function ChatBox({ wallet }: { wallet: string }) {
 
     const promptText = input.trim();
     const transferIntent = parseTransferIntent(promptText);
+    const amountFromText = extractAmount(promptText);
+    const recipientFromText = extractRecipient(promptText);
     const isAskingAboutAptTransfer =
-      /\b(can|could|how|want|bghit|wach|n9dar|nkdr)\b/i.test(promptText) &&
+      /\b(can|could|how|want|bghit|baghi|wach|n9dar|nkdr|ndir)\b/i.test(promptText) &&
       /\b(send|transfer|pay|sift|nsift)\b/i.test(promptText) &&
       /\bapt\b/i.test(promptText);
+    const isStartingTransfer =
+      /\b(send|transfer|pay|sift|nsift|nseft|bghit\s+nsift|baghi\s+nsift)\b/i.test(promptText) &&
+      (/\bapt\b/i.test(promptText) || !!pendingTransfer);
 
     setMessages((prev) => [...prev, { role: "user", content: promptText }]);
     setInput("");
 
+    if (pendingTransfer) {
+      const nextTransfer = {
+        ...pendingTransfer,
+        amount: pendingTransfer.amount || amountFromText,
+        recipient: pendingTransfer.recipient || recipientFromText,
+        prompt: `${pendingTransfer.prompt}\n${promptText}`,
+      };
+
+      if (nextTransfer.amount && nextTransfer.recipient) {
+        const intent = buildTransferIntentFromParts(
+          nextTransfer.amount,
+          nextTransfer.recipient
+        );
+        setPendingTransfer(null);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "Great, I have everything needed. Review this transfer before signing in Petra.",
+            status: "action",
+            transferIntent: intent,
+            actionPrompt: nextTransfer.prompt,
+          },
+        ]);
+        return;
+      }
+
+      setPendingTransfer(nextTransfer);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: !nextTransfer.amount
+            ? "How much APT do you want to send?"
+            : "Send it to which Aptos address? Paste the 0x recipient address.",
+        },
+      ]);
+      return;
+    }
+
     if (!transferIntent && isAskingAboutAptTransfer) {
+      setPendingTransfer({
+        token: "APT",
+        amount: amountFromText,
+        recipient: recipientFromText,
+        prompt: promptText,
+      });
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content:
-            "Yes. Send APT by writing the amount and recipient address, for example: send 0.1 APT to 0x123... After that I will show a transfer preview and ask you to confirm in Petra.",
+            amountFromText
+              ? "Yes. Send it to which Aptos address? Paste the 0x recipient address."
+              : "Yes. How much APT do you want to send, and to which 0x address?",
+        },
+      ]);
+      return;
+    }
+
+    if (!transferIntent && isStartingTransfer) {
+      const nextTransfer: PendingTransfer = {
+        token: "APT",
+        amount: amountFromText,
+        recipient: recipientFromText,
+        prompt: promptText,
+      };
+
+      if (nextTransfer.amount && nextTransfer.recipient) {
+        const intent = buildTransferIntentFromParts(
+          nextTransfer.amount,
+          nextTransfer.recipient
+        );
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "I found a token transfer request. Review it before signing in Petra.",
+            status: "action",
+            transferIntent: intent,
+            actionPrompt: promptText,
+          },
+        ]);
+        return;
+      }
+
+      setPendingTransfer(nextTransfer);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: !nextTransfer.amount
+            ? "Sure. How much APT do you want to send?"
+            : "Sure. Send it to which Aptos address? Paste the 0x recipient address.",
         },
       ]);
       return;
