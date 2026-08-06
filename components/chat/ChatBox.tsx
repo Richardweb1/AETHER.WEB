@@ -120,9 +120,25 @@ export default function ChatBox({ wallet }: { wallet: string }) {
 
     const promptText = input.trim();
     const transferIntent = parseTransferIntent(promptText);
+    const isAskingAboutAptTransfer =
+      /\b(can|could|how|want|bghit|wach|n9dar|nkdr)\b/i.test(promptText) &&
+      /\b(send|transfer|pay|sift|nsift)\b/i.test(promptText) &&
+      /\bapt\b/i.test(promptText);
 
     setMessages((prev) => [...prev, { role: "user", content: promptText }]);
     setInput("");
+
+    if (!transferIntent && isAskingAboutAptTransfer) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Yes. Send APT by writing the amount and recipient address, for example: send 0.1 APT to 0x123... After that I will show a transfer preview and ask you to confirm in Petra.",
+        },
+      ]);
+      return;
+    }
 
     if (transferIntent) {
       setMessages((prev) => [
