@@ -79,7 +79,10 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     setMessages((prev) => {
       const updated = [...prev];
       const idx = updated.findIndex(
-        (m) => m.status === "thinking" || m.status === "storing"
+        (m) =>
+          m.status === "thinking" ||
+          m.status === "storing" ||
+          m.status === "action"
       );
       if (idx !== -1) updated[idx] = message;
       return updated;
@@ -111,6 +114,7 @@ export default function ChatBox({ wallet }: { wallet: string }) {
     promptText: string,
     intent: TransferIntent
   ) => {
+    if (isLoading) return;
     setIsLoading(true);
     replaceLatestPending({
       role: "assistant",
