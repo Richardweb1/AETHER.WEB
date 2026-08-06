@@ -9,7 +9,13 @@ const walletRequests = new Map<string, number>();
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { wallet_address, prompt } = body;
+    const {
+      wallet_address,
+      prompt,
+      memory_type,
+      transfer,
+      tx_hash,
+    } = body;
 
     if (!prompt) {
       return NextResponse.json({ success: false, error: "No prompt provided" }, { status: 400 });
@@ -42,11 +48,19 @@ export async function POST(req: Request) {
     ipRequests.set(ip, 1);
     walletRequests.set(walletAddr, 1);
 
+    const isTransferMemory = memory_type === "token_transfer";
+
     // 1. Generate AI response
-    const aiResponse = await generateAIResponse(prompt);
+    const aiResponse = isTransferMemory
+      ? `Transfer confirmed. ${transfer?.amount || ""} ${transfer?.token || "APT"} was sent to ${transfer?.recipient || "the recipient"} and this wallet action is being saved to Shelby memory.`
+      : await generateAIResponse(prompt);
 
     // 2. Build memory entry
-    const entry = buildMemoryEntry(prompt, aiResponse, walletAddr);
+    const entry = buildMemoryEntry(prompt, aiResponse, walletAddr, {
+      memory_type: isTransferMemory ? "token_transfer" : "chat",
+      transfer,
+      tx_hash,
+    });
 
     // 3. Store on Shelby
     const result = await storeMemory(entry);
@@ -61,8 +75,9 @@ export async function POST(req: Request) {
       timestamp: result.timestamp,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Memory API failed";
     console.error("Memory API Error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
